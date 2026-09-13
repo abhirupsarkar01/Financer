@@ -656,7 +656,13 @@
             <div class="field"><label>Year</label><input type="number" id="backup-year" min="2000" max="2100"></div>
             <div style="display:flex; align-items:flex-end;"><button type="button" class="btn small" id="btn-export-year" style="width:100%;">Export year</button></div>
           </div>
-          <p class="sync-note" style="margin:0;">A full CSV snapshot for that year — every expense, plus a category and recurring/other summary, plus the current state of your recurring payments, investments, goals, and incentives.</p>
+          <p class="sync-note" style="margin:0;">A CSV snapshot for that year — good for reading and reporting, not for restoring.</p>
+          <div class="two-col">
+            <button type="button" class="btn small" id="btn-export-json">Full backup (.json)</button>
+            <button type="button" class="btn small ghost" id="btn-import-json">Restore backup…</button>
+          </div>
+          <input type="file" id="import-json-file" accept="application/json,.json" hidden>
+          <p class="sync-note" style="margin:0;">This is the one to use before switching phones: export it here, then open Financer on the new phone and Restore the same file. Everything — every recurring payment, expense, investment, goal, and incentive — comes back exactly as it was.</p>
           <button type="button" class="btn small ghost danger" id="btn-flush-data" style="align-self:flex-start;">Flush all app data…</button>
         </div>
       </div>
@@ -687,6 +693,20 @@
     <div class="sheet-foot">
       <button type="button" class="btn ghost" data-close>Cancel</button>
       <button type="button" class="btn danger" id="btn-flush-confirm-yes">Yes, erase everything</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- IMPORT CONFIRMATION -->
+<dialog id="dlg-import-confirm">
+  <div class="sheet">
+    <div class="sheet-head"><h3>Restore this backup?</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <p class="sync-note" id="import-confirm-detail"></p>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="button" class="btn primary" id="btn-import-confirm-yes">Yes, restore this backup</button>
     </div>
   </div>
 </dialog>
@@ -1961,6 +1981,66 @@
     state.settings = { currency: "€", monthlyIncome: 0 };
     saveLocal();
     document.getElementById("dlg-flush-confirm").close();
+    document.getElementById("dlg-settings").close();
+    renderAll();
+  });
+
+  // ---------- FULL BACKUP / RESTORE (the actual move-to-a-new-phone path;
+  // the CSV above is for reading, this is for restoring exactly) ----------
+  document.getElementById("btn-export-json").addEventListener("click", async function(){
+    if(!downloadsNamespace) return;
+    var backup = {
+      financerBackup: 1,
+      exportedAt: new Date().toISOString(),
+      dues: state.dues, expenses: state.expenses, investments: state.investments,
+      goals: state.goals, incomes: state.incomes, settings: state.settings
+    };
+    var filename = "financer-full-backup-" + todayISO() + ".json";
+    try{ await downloadsNamespace.save({ filename: filename, data: JSON.stringify(backup, null, 2) }); }catch(e){}
+  });
+  var pendingImportData = null;
+  document.getElementById("btn-import-json").addEventListener("click", function(){
+    document.getElementById("import-json-file").click();
+  });
+  document.getElementById("import-json-file").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var data;
+      try{ data = JSON.parse(reader.result); }
+      catch(err){ alert("That file isn't valid — it doesn't look like a Financer backup."); return; }
+      if(!data || typeof data!=="object" || !Array.isArray(data.expenses) || !Array.isArray(data.dues)){
+        alert("That file doesn't look like a Financer backup.");
+        return;
+      }
+      pendingImportData = data;
+      var counts = [
+        (data.dues||[]).length + " recurring payment" + ((data.dues||[]).length===1?"":"s"),
+        (data.expenses||[]).length + " expense" + ((data.expenses||[]).length===1?"":"s"),
+        (data.investments||[]).length + " investment" + ((data.investments||[]).length===1?"":"s"),
+        (data.goals||[]).length + " savings goal" + ((data.goals||[]).length===1?"":"s"),
+        (data.incomes||[]).length + " incentive" + ((data.incomes||[]).length===1?"":"s")
+      ];
+      document.getElementById("import-confirm-detail").textContent =
+        "This file has " + counts.join(", ") + (data.exportedAt ? (", exported " + new Date(data.exportedAt).toLocaleDateString()) : "") +
+        ". Restoring it replaces everything currently in the app. There is no undo.";
+      openDlg("dlg-import-confirm");
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById("btn-import-confirm-yes").addEventListener("click", function(){
+    if(!pendingImportData) return;
+    state.dues = pendingImportData.dues || [];
+    state.expenses = pendingImportData.expenses || [];
+    state.investments = pendingImportData.investments || [];
+    state.goals = pendingImportData.goals || [];
+    state.incomes = pendingImportData.incomes || [];
+    state.settings = Object.assign({ currency: "€", monthlyIncome: 0 }, pendingImportData.settings || {});
+    pendingImportData = null;
+    saveLocal();
+    document.getElementById("dlg-import-confirm").close();
     document.getElementById("dlg-settings").close();
     renderAll();
   });
