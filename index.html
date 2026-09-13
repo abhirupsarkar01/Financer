@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Financer</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="description" content="A private, on-device finance tracker.">
 <meta name="theme-color" content="#EDE8DA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17140F" media="(prefers-color-scheme: dark)">
@@ -162,6 +162,11 @@
   .tile .sub{ font-size:0.76rem; color:var(--ink-soft); }
   .tile.warn .value{ color:var(--negative); }
   .tile.good .value{ color:var(--accent); }
+  .balance-banner{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; display:flex; flex-direction:column; gap:4px; }
+  .balance-banner .label{ font-size:0.76rem; color:var(--ink-soft); font-weight:600; }
+  .balance-banner .value{ font-size:2rem; font-weight:700; }
+  .balance-banner .value.negative{ color:var(--negative); }
+  .balance-banner .sub{ font-size:0.78rem; color:var(--ink-soft); }
 
   .panel{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
   .panel.suggest{ background:var(--gold-soft); border-color:var(--gold); }
@@ -367,6 +372,11 @@
 
     <!-- OVERVIEW -->
     <section class="tab active" id="tab-overview">
+      <div class="balance-banner">
+        <span class="label">Available this month</span>
+        <span class="value num" id="ov-available">—</span>
+        <span class="sub" id="ov-available-sub">—</span>
+      </div>
       <div class="tiles">
         <div class="tile good">
           <span class="label">Net worth</span>
@@ -662,7 +672,7 @@
             <button type="button" class="btn small ghost" id="btn-import-json">Restore backup…</button>
           </div>
           <input type="file" id="import-json-file" accept="application/json,.json" hidden>
-          <p class="sync-note" style="margin:0;">This is the one to use before switching phones: export it here, then open Financer on the new phone and Restore the same file. Everything — every recurring payment, expense, investment, goal, and incentive — comes back exactly as it was.</p>
+          <p class="sync-note" style="margin:0;">This is the one to use before switching phones: tap Full backup, then save the file to iCloud Drive (or Files) when your browser prompts you. On the new phone, open Financer, tap Restore backup, and pick that same file from iCloud/Files. Everything — every recurring payment, expense, investment, goal, and incentive — comes back exactly as it was.</p>
           <button type="button" class="btn small ghost danger" id="btn-flush-data" style="align-self:flex-start;">Flush all app data…</button>
         </div>
       </div>
@@ -1135,6 +1145,14 @@
       .reduce(function(s,i){ return s+(Number(i.amount)||0); },0);
     var incomeTotal = mi + incentivesThisMonth;
     var duesThisMonthTotal = fixedActive.reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+
+    var available = incomeTotal - spent - duesThisMonthTotal;
+    var availEl = document.getElementById("ov-available");
+    availEl.textContent = fmt(available);
+    availEl.className = "value num" + (available < 0 ? " negative" : "");
+    document.getElementById("ov-available-sub").textContent =
+      fmt(incomeTotal) + " income − " + fmt(spent + duesThisMonthTotal) + " spent & due";
+
     if(incomeTotal > 0){
       var rate = ((incomeTotal - spent - duesThisMonthTotal) / incomeTotal) * 100;
       document.getElementById("ov-rate").textContent = Math.round(rate) + "%";
@@ -1648,11 +1666,17 @@
   // ---------- REPORTS (weekly / monthly / yearly breakdown) ----------
   var reportState = { period:null, month:null, week:1, year:null };
   var lastReportBuckets = [];
-  var downloadsNamespace = null;
-  (async function(){
-    try{ downloadsNamespace = window.claude ? await window.claude.use("downloads") : null; }
-    catch(e){ downloadsNamespace = null; }
-  })();
+  function saveFile(filename, data, mime){
+    var blob = new Blob([data], {type: mime || "application/octet-stream"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
 
   document.querySelectorAll("[data-report-period]").forEach(function(b){
     b.addEventListener("click", function(){ openReport(b.dataset.reportPeriod); });
@@ -1914,11 +1938,10 @@
     lines.push("", "By type", "Type,Total", "Recurring,"+rec.toFixed(2), "Other,"+non.toFixed(2));
     return lines.join("\r\n");
   }
-  document.getElementById("report-export").addEventListener("click", async function(){
-    if(!downloadsNamespace) return;
+  document.getElementById("report-export").addEventListener("click", function(){
     var csv = buildReportCsv();
     var filename = "expenses-" + reportPeriodLabel().replace(/[^a-z0-9]+/gi,"-").toLowerCase() + ".csv";
-    try{ await downloadsNamespace.save({ filename: filename, data: csv }); }catch(e){}
+    saveFile(filename, csv, "text/csv");
   });
 
   // ---------- BACKUP (a whole year) & FLUSH ----------
@@ -1969,11 +1992,10 @@
 
     return lines.join("\r\n");
   }
-  document.getElementById("btn-export-year").addEventListener("click", async function(){
-    if(!downloadsNamespace) return;
+  document.getElementById("btn-export-year").addEventListener("click", function(){
     var year = document.getElementById("backup-year").value || String(new Date().getFullYear());
     var csv = buildYearBackupCsv(year);
-    try{ await downloadsNamespace.save({ filename: "financer-backup-"+year+".csv", data: csv }); }catch(e){}
+    saveFile("financer-backup-"+year+".csv", csv, "text/csv");
   });
   document.getElementById("btn-flush-data").addEventListener("click", function(){ openDlg("dlg-flush-confirm"); });
   document.getElementById("btn-flush-confirm-yes").addEventListener("click", function(){
@@ -1987,8 +2009,7 @@
 
   // ---------- FULL BACKUP / RESTORE (the actual move-to-a-new-phone path;
   // the CSV above is for reading, this is for restoring exactly) ----------
-  document.getElementById("btn-export-json").addEventListener("click", async function(){
-    if(!downloadsNamespace) return;
+  document.getElementById("btn-export-json").addEventListener("click", function(){
     var backup = {
       financerBackup: 1,
       exportedAt: new Date().toISOString(),
@@ -1996,7 +2017,7 @@
       goals: state.goals, incomes: state.incomes, settings: state.settings
     };
     var filename = "financer-full-backup-" + todayISO() + ".json";
-    try{ await downloadsNamespace.save({ filename: filename, data: JSON.stringify(backup, null, 2) }); }catch(e){}
+    saveFile(filename, JSON.stringify(backup, null, 2), "application/json");
   });
   var pendingImportData = null;
   document.getElementById("btn-import-json").addEventListener("click", function(){
