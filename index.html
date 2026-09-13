@@ -580,7 +580,7 @@
       <input type="hidden" name="category">
       <div class="two-col">
         <div class="field"><label>Date</label><input name="date" type="date" required></div>
-        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
+        <div class="field"><label id="expense-amount-label">Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
@@ -660,6 +660,43 @@
     <div class="sheet-head"><h3>Settings</h3><button type="button" class="btn ghost small" data-close>Close</button></div>
     <div class="sheet-body">
       <div class="field"><label>Monthly income</label><input name="monthlyIncome" type="number" step="0.01" min="0"></div>
+      <div class="field">
+        <label>Spending currency</label>
+        <select name="spendCurrency" id="settings-spend-currency">
+          <option value="EUR">€ Euro (home)</option>
+          <option value="USD">$ US Dollar</option>
+          <option value="GBP">£ British Pound</option>
+          <option value="JPY">¥ Japanese Yen</option>
+          <option value="KRW">₩ South Korean Won</option>
+          <option value="CNY">¥ Chinese Yuan</option>
+          <option value="INR">₹ Indian Rupee</option>
+          <option value="AUD">A$ Australian Dollar</option>
+          <option value="CAD">C$ Canadian Dollar</option>
+          <option value="CHF">Fr Swiss Franc</option>
+          <option value="SEK">kr Swedish Krona</option>
+          <option value="NOK">kr Norwegian Krone</option>
+          <option value="DKK">kr Danish Krone</option>
+          <option value="PLN">zł Polish Zloty</option>
+          <option value="CZK">Kč Czech Koruna</option>
+          <option value="HUF">Ft Hungarian Forint</option>
+          <option value="TRY">₺ Turkish Lira</option>
+          <option value="THB">฿ Thai Baht</option>
+          <option value="SGD">S$ Singapore Dollar</option>
+          <option value="HKD">HK$ Hong Kong Dollar</option>
+          <option value="NZD">NZ$ New Zealand Dollar</option>
+          <option value="MXN">MX$ Mexican Peso</option>
+          <option value="BRL">R$ Brazilian Real</option>
+          <option value="ZAR">R South African Rand</option>
+          <option value="ILS">₪ Israeli Shekel</option>
+          <option value="IDR">Rp Indonesian Rupiah</option>
+          <option value="MYR">RM Malaysian Ringgit</option>
+          <option value="PHP">₱ Philippine Peso</option>
+          <option value="RON">lei Romanian Leu</option>
+          <option value="BGN">лв Bulgarian Lev</option>
+          <option value="ISK">kr Icelandic Krona</option>
+        </select>
+        <p class="sync-note" style="margin-top:4px;">New expenses are entered in this currency and converted to € automatically using that day's exchange rate. Switch back to Euro when you're done traveling — expenses you've already logged keep whatever currency they were entered in.</p>
+      </div>
       <div class="field">
         <label>Incentives this month</label>
         <div id="settings-incentives-list" class="panel" style="margin-top:2px;"></div>
@@ -785,8 +822,53 @@
 
   var state = {
     dues: [], expenses: [], investments: [], goals: [], incomes: [],
-    settings: { currency: "€", monthlyIncome: 0 }
+    settings: { currency: "€", monthlyIncome: 0, spendCurrency: "EUR" },
+    fxCache: {}
   };
+
+  // Frankfurter/ECB-tracked currencies, for the "spending currency" picker.
+  var CURRENCIES = {
+    EUR:{symbol:"€",name:"Euro (home)"}, USD:{symbol:"$",name:"US Dollar"},
+    GBP:{symbol:"£",name:"British Pound"}, JPY:{symbol:"¥",name:"Japanese Yen"},
+    KRW:{symbol:"₩",name:"South Korean Won"}, CNY:{symbol:"¥",name:"Chinese Yuan"},
+    INR:{symbol:"₹",name:"Indian Rupee"}, AUD:{symbol:"A$",name:"Australian Dollar"},
+    CAD:{symbol:"C$",name:"Canadian Dollar"}, CHF:{symbol:"Fr",name:"Swiss Franc"},
+    SEK:{symbol:"kr",name:"Swedish Krona"}, NOK:{symbol:"kr",name:"Norwegian Krone"},
+    DKK:{symbol:"kr",name:"Danish Krone"}, PLN:{symbol:"zł",name:"Polish Zloty"},
+    CZK:{symbol:"Kč",name:"Czech Koruna"}, HUF:{symbol:"Ft",name:"Hungarian Forint"},
+    TRY:{symbol:"₺",name:"Turkish Lira"}, THB:{symbol:"฿",name:"Thai Baht"},
+    SGD:{symbol:"S$",name:"Singapore Dollar"}, HKD:{symbol:"HK$",name:"Hong Kong Dollar"},
+    NZD:{symbol:"NZ$",name:"New Zealand Dollar"}, MXN:{symbol:"MX$",name:"Mexican Peso"},
+    BRL:{symbol:"R$",name:"Brazilian Real"}, ZAR:{symbol:"R",name:"South African Rand"},
+    ILS:{symbol:"₪",name:"Israeli Shekel"}, IDR:{symbol:"Rp",name:"Indonesian Rupiah"},
+    MYR:{symbol:"RM",name:"Malaysian Ringgit"}, PHP:{symbol:"₱",name:"Philippine Peso"},
+    RON:{symbol:"lei",name:"Romanian Leu"}, BGN:{symbol:"лв",name:"Bulgarian Lev"},
+    ISK:{symbol:"kr",name:"Icelandic Krona"}
+  };
+
+  // Converts an amount in a foreign currency to EUR using that day's ECB
+  // reference rate (so a late-logged or edited expense stays accurate to
+  // when it actually happened, not to whenever it's saved). Falls back to
+  // the last rate this device has seen for that currency when offline —
+  // flagged as estimated so it's easy to spot and correct once back online
+  // (re-opening and re-saving the expense re-runs this and clears the flag).
+  async function convertToEUR(amount, currency, dateISO){
+    if(!currency || currency==="EUR") return { eur: amount, estimated:false };
+    try{
+      var resp = await fetch("https://api.frankfurter.app/"+dateISO+"?from="+currency+"&to=EUR");
+      if(!resp.ok) throw new Error("bad response");
+      var json = await resp.json();
+      var rate = json.rates && json.rates.EUR;
+      if(!rate) throw new Error("no rate");
+      state.fxCache[currency] = { rate: rate, date: dateISO };
+      saveLocal();
+      return { eur: amount*rate, estimated:false };
+    }catch(err){
+      var cached = state.fxCache[currency];
+      if(cached) return { eur: amount*cached.rate, estimated:true };
+      return null;
+    }
+  }
   var LOCAL_KEY = "financer_v1";
   var editingGoalId = null;
 
@@ -1032,8 +1114,14 @@
     return items.map(function(e){
       var d = e.date ? new Date(e.date+"T00:00:00") : null;
       var dl = d ? d.toLocaleDateString(undefined,{day:"2-digit", month:"short", year:"numeric"}) : "";
+      var fxNote = "";
+      if(e.originalCurrency && e.originalCurrency!=="EUR"){
+        var sym = (CURRENCIES[e.originalCurrency]||{}).symbol || "";
+        fxNote = '<div class="tag">' + sym + Math.round(e.originalAmount).toLocaleString() + " " + esc(e.originalCurrency) +
+          (e.estimatedRate ? " · estimated rate" : "") + '</div>';
+      }
       return '<div class="row">' +
-        '<div class="main"><div class="name">'+esc(e.note || category)+'</div><div class="tag">'+dl+'</div></div>' +
+        '<div class="main"><div class="name">'+esc(e.note || category)+'</div><div class="tag">'+dl+'</div>'+fxNote+'</div>' +
         '<span class="amt neg num">-'+fmt(e.amount)+'</span>' +
         '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
     }).join("");
@@ -1108,6 +1196,7 @@
     var el = document.getElementById("today-label");
     el.textContent = new Date().toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
     document.querySelector('[name="monthlyIncome"]').value = state.settings.monthlyIncome || "";
+    document.getElementById("settings-spend-currency").value = state.settings.spendCurrency || "EUR";
     var yearEl = document.getElementById("backup-year");
     if(!yearEl.value) yearEl.value = String(new Date().getFullYear());
     renderIncentivesList();
@@ -1548,20 +1637,56 @@
     f.reset();
     f.id.value = exp ? exp.id : "";
     f.category.value = exp ? exp.category : category;
-    document.getElementById("expense-dlg-title").textContent = (exp ? "Edit — " : "Log — ") + f.category.value;
+    // A saved expense keeps whatever currency it was entered in, forever —
+    // only a brand-new entry picks up the currently-selected spending
+    // currency. That way editing an old euro expense while traveling (or
+    // an old won expense after coming home) never silently reinterprets it.
+    var currency = exp ? (exp.originalCurrency || "EUR") : (state.settings.spendCurrency || "EUR");
+    var curInfo = CURRENCIES[currency] || CURRENCIES.EUR;
+    document.getElementById("expense-dlg-title").textContent =
+      (exp ? "Edit — " : "Log — ") + f.category.value + (currency!=="EUR" ? " (" + currency + ")" : "");
+    document.getElementById("expense-amount-label").textContent =
+      currency==="EUR" ? "Amount" : "Amount (" + curInfo.symbol + " " + currency + ")";
     document.getElementById("expense-delete").style.display = exp ? "" : "none";
-    if(exp){ f.date.value = exp.date; f.amount.value = exp.amount; f.note.value = exp.note||""; }
-    else { f.date.value = todayISO(); }
+    if(exp){
+      f.date.value = exp.date;
+      f.amount.value = (exp.originalAmount!=null ? exp.originalAmount : exp.amount);
+      f.note.value = exp.note||"";
+    } else { f.date.value = todayISO(); }
     openDlg("dlg-expense");
     if(!exp) f.amount.focus();
   }
-  document.getElementById("form-expense").addEventListener("submit", function(e){
+  document.getElementById("form-expense").addEventListener("submit", async function(e){
     e.preventDefault();
     var f = e.target;
     var category = f.category.value;
     var note = f.note.value.trim();
     var id = f.id.value;
-    var data = { date: f.date.value, amount: parseFloat(f.amount.value)||0, category: category, note: note };
+    var date = f.date.value;
+    var enteredAmount = parseFloat(f.amount.value)||0;
+    var existing = id ? state.expenses.find(function(x){ return x.id===id; }) : null;
+    var currency = id ? ((existing && existing.originalCurrency) || "EUR") : (state.settings.spendCurrency || "EUR");
+    var data = { date: date, category: category, note: note };
+    if(currency === "EUR"){
+      data.amount = enteredAmount;
+      data.originalAmount = null;
+      data.originalCurrency = null;
+      data.estimatedRate = null;
+    } else {
+      var submitBtn = f.querySelector('button[type="submit"]');
+      var originalLabel = submitBtn.textContent;
+      submitBtn.disabled = true; submitBtn.textContent = "Converting…";
+      var conv = await convertToEUR(enteredAmount, currency, date);
+      submitBtn.disabled = false; submitBtn.textContent = originalLabel;
+      if(!conv){
+        alert("No exchange rate available for " + currency + " yet — you're offline and haven't converted this currency on this device before. Connect once to fetch a rate, then try again.");
+        return;
+      }
+      data.amount = Math.round(conv.eur * 100) / 100;
+      data.originalAmount = enteredAmount;
+      data.originalCurrency = currency;
+      data.estimatedRate = conv.estimated;
+    }
     (id ? updateItem("expense", id, data) : addItem("expense", data)).then(function(){ f.closest("dialog").close(); });
   });
   document.getElementById("expense-delete").addEventListener("click", function(){
@@ -2009,7 +2134,8 @@
   document.getElementById("btn-flush-data").addEventListener("click", function(){ openDlg("dlg-flush-confirm"); });
   document.getElementById("btn-flush-confirm-yes").addEventListener("click", function(){
     state.dues = []; state.expenses = []; state.investments = []; state.goals = []; state.incomes = [];
-    state.settings = { currency: "€", monthlyIncome: 0 };
+    state.settings = { currency: "€", monthlyIncome: 0, spendCurrency: "EUR" };
+    state.fxCache = {};
     saveLocal();
     document.getElementById("dlg-flush-confirm").close();
     document.getElementById("dlg-settings").close();
@@ -2023,7 +2149,7 @@
       financerBackup: 1,
       exportedAt: new Date().toISOString(),
       dues: state.dues, expenses: state.expenses, investments: state.investments,
-      goals: state.goals, incomes: state.incomes, settings: state.settings
+      goals: state.goals, incomes: state.incomes, settings: state.settings, fxCache: state.fxCache
     };
     var filename = "financer-full-backup-" + todayISO() + ".json";
     saveFile(filename, JSON.stringify(backup, null, 2), "application/json");
@@ -2067,7 +2193,8 @@
     state.investments = pendingImportData.investments || [];
     state.goals = pendingImportData.goals || [];
     state.incomes = pendingImportData.incomes || [];
-    state.settings = Object.assign({ currency: "€", monthlyIncome: 0 }, pendingImportData.settings || {});
+    state.settings = Object.assign({ currency: "€", monthlyIncome: 0, spendCurrency: "EUR" }, pendingImportData.settings || {});
+    state.fxCache = pendingImportData.fxCache || {};
     pendingImportData = null;
     saveLocal();
     document.getElementById("dlg-import-confirm").close();
@@ -2079,7 +2206,7 @@
   document.getElementById("form-settings").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
-    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0 })
+    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0, spendCurrency: f.spendCurrency.value || "EUR" })
       .then(function(){ f.closest("dialog").close(); });
   });
 
