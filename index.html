@@ -177,6 +177,7 @@
   .panel-head .meta{ font-size:0.8rem; color:var(--ink-soft); }
 
   .row{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid var(--line); }
+  .row[data-expense-id]{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   .row:first-of-type{ border-top:none; }
   .row .main{ flex:1; min-width:0; }
   .row .name{ font-weight:500; }
@@ -764,6 +765,17 @@
   </div>
 </dialog>
 
+<!-- ROW ACTIONS (long-press an expense entry) -->
+<dialog id="dlg-row-actions">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="row-actions-title">Expense</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-foot" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <button type="button" class="btn primary" id="row-actions-edit">Edit</button>
+      <button type="button" class="btn danger" id="row-actions-delete">Delete</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- OVERVIEW QUICK LOG: an incentive, or a payment against any ongoing
      recurring due — reached from the + button while on Overview -->
 <dialog id="dlg-quick-overview">
@@ -1120,7 +1132,7 @@
         fxNote = '<div class="tag">' + sym + Math.round(e.originalAmount).toLocaleString() + " " + esc(e.originalCurrency) +
           (e.estimatedRate ? " · estimated rate" : "") + '</div>';
       }
-      return '<div class="row">' +
+      return '<div class="row" data-expense-id="'+e.id+'" data-cat="'+esc(category)+'">' +
         '<div class="main"><div class="name">'+esc(e.note || category)+'</div><div class="tag">'+dl+'</div>'+fxNote+'</div>' +
         '<span class="amt neg num">-'+fmt(e.amount)+'</span>' +
         '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
@@ -1702,6 +1714,53 @@
     if(editBtn) openExpenseDialog(state.expenses.find(function(x){return x.id===editBtn.dataset.editExpense;}), editBtn.dataset.cat);
   });
 
+  // ---------- ROW ACTIONS (long-press an expense entry for Edit/Delete) ----------
+  var rowActionsTarget = null;
+  function openRowActions(id, category){
+    var exp = state.expenses.find(function(x){ return x.id===id; });
+    if(!exp) return;
+    rowActionsTarget = { id: id, category: category };
+    document.getElementById("row-actions-title").textContent = exp.note || category;
+    openDlg("dlg-row-actions");
+  }
+  document.getElementById("row-actions-edit").addEventListener("click", function(){
+    document.getElementById("dlg-row-actions").close();
+    if(rowActionsTarget) openExpenseDialog(state.expenses.find(function(x){return x.id===rowActionsTarget.id;}), rowActionsTarget.category);
+  });
+  document.getElementById("row-actions-delete").addEventListener("click", function(){
+    if(!rowActionsTarget) return;
+    if(confirm("Delete this expense? There is no undo.")){
+      deleteItem("expense", rowActionsTarget.id);
+      document.getElementById("dlg-row-actions").close();
+    }
+  });
+  // Pointer Events unify mouse/touch: a ~500ms hold with little movement
+  // (so an ordinary scroll doesn't trigger it) opens the action sheet; a
+  // quick tap still falls through to the normal click handlers above
+  // (the edit pencil, or nothing on a bare row) since the timer never fires.
+  (function(){
+    var pressTimer = null, startX = 0, startY = 0;
+    var LONG_PRESS_MS = 500, MOVE_TOLERANCE = 10;
+    function clearPress(){ if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } }
+    document.addEventListener("pointerdown", function(e){
+      var row = e.target.closest(".row[data-expense-id]");
+      if(!row) return;
+      startX = e.clientX; startY = e.clientY;
+      clearPress();
+      pressTimer = setTimeout(function(){
+        pressTimer = null;
+        if(navigator.vibrate) navigator.vibrate(10);
+        openRowActions(row.dataset.expenseId, row.dataset.cat);
+      }, LONG_PRESS_MS);
+    });
+    document.addEventListener("pointermove", function(e){
+      if(!pressTimer) return;
+      if(Math.abs(e.clientX-startX) > MOVE_TOLERANCE || Math.abs(e.clientY-startY) > MOVE_TOLERANCE) clearPress();
+    });
+    document.addEventListener("pointerup", clearPress);
+    document.addEventListener("pointercancel", clearPress);
+  })();
+
   // ---------- MISCELLANEOUS recurring-tag suggestions ----------
   // Promoting a detected tag doesn't create a category tab — it opens the
   // Recurring dialog pre-filled, so the thing becomes a real recurring due
@@ -1989,7 +2048,7 @@
     var d = new Date(dateStr+"T00:00:00");
     titleEl.textContent = d.toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long", year:"numeric"});
     listEl.innerHTML = items.length ? items.map(function(e){
-      return '<div class="row"><div class="main"><div class="name">'+esc(e.note||e.category)+'</div><div class="tag">'+esc(e.category)+(e.recurring?' · recurring':'')+'</div></div>' +
+      return '<div class="row" data-expense-id="'+e.id+'" data-cat="'+esc(e.category)+'"><div class="main"><div class="name">'+esc(e.note||e.category)+'</div><div class="tag">'+esc(e.category)+(e.recurring?' · recurring':'')+'</div></div>' +
         '<span class="amt neg num">-'+fmt(e.amount)+'</span>' +
         '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(e.category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
     }).join("") : '<div class="empty">Nothing logged this day.</div>';
