@@ -1,0 +1,2035 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Financer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A private, on-device finance tracker.">
+<meta name="theme-color" content="#EDE8DA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17140F" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Financer">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#EDE8DA;
+    --paper-raised:#F6F2E7;
+    --ink:#241F17;
+    --ink-soft:#6B6252;
+    --line:#D9D0B8;
+    --accent:#2F6F5E;
+    --accent-soft:#E1EBE3;
+    --negative:#AE4A38;
+    --negative-soft:#F3E3DD;
+    --gold:#A97A24;
+    --gold-soft:#F1E7D2;
+    --chart-1:#2F6F5E; --chart-2:#A97A24; --chart-3:#AE4A38;
+    --chart-4:#4C6E8C; --chart-5:#8A5A8F; --chart-6:#6B7F3E;
+    --shadow: 0 1px 2px rgba(36,31,23,0.08), 0 4px 16px rgba(36,31,23,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#17140F;
+      --paper-raised:#211D15;
+      --ink:#EEE7D6;
+      --ink-soft:#A69A81;
+      --line:#3B3527;
+      --accent:#57AE8F;
+      --accent-soft:#1E2D26;
+      --negative:#E08C77;
+      --negative-soft:#33221D;
+      --gold:#D9A94E;
+      --gold-soft:#332A17;
+      --chart-1:#57AE8F; --chart-2:#D9A94E; --chart-3:#E08C77;
+      --chart-4:#7FA0C2; --chart-5:#C08FC6; --chart-6:#9FB86E;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#17140F;
+    --paper-raised:#211D15;
+    --ink:#EEE7D6;
+    --ink-soft:#A69A81;
+    --line:#3B3527;
+    --accent:#57AE8F;
+    --accent-soft:#1E2D26;
+    --negative:#E08C77;
+    --negative-soft:#33221D;
+    --gold:#D9A94E;
+    --gold-soft:#332A17;
+    --chart-1:#57AE8F; --chart-2:#D9A94E; --chart-3:#E08C77;
+    --chart-4:#7FA0C2; --chart-5:#C08FC6; --chart-6:#9FB86E;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Work Sans", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3{ font-family:"Fraunces", Georgia, serif; font-weight:600; letter-spacing:-0.01em; text-wrap:balance; margin:0; }
+  .num{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  button{ font-family:inherit; }
+  ::selection{ background:var(--accent-soft); }
+
+  #app{ max-width:1180px; margin:0 auto; padding-bottom:96px; }
+
+  /* header */
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    padding:14px 18px calc(10px + env(safe-area-inset-top,0px)) 18px;
+    padding-top:calc(14px + env(safe-area-inset-top,0px));
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  }
+  header.top .id{ display:flex; align-items:baseline; gap:10px; }
+  header.top h1{ font-size:1.35rem; }
+  header.top .date{ color:var(--ink-soft); font-size:0.85rem; }
+  header.top .gear{
+    background:none; border:1px solid var(--line); border-radius:999px;
+    width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-soft); cursor:pointer; flex:none;
+  }
+  header.top .gear:hover{ border-color:var(--ink-soft); color:var(--ink); }
+  header.top .gear svg{ width:18px; height:18px; }
+
+  main{ padding:18px; display:flex; flex-direction:column; gap:26px; }
+
+  /* tabs: scrollable bottom bar on mobile, sidebar on desktop. Every
+     category — including the daily-life ones like Groceries — is an
+     equal tab here, not a separate quick-action row. */
+  nav.tabs{
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    background:var(--paper-raised);
+    border-top:1px solid var(--line);
+    display:flex; overflow-x:auto; scrollbar-width:none;
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  nav.tabs::-webkit-scrollbar{ display:none; }
+  nav.tabs button{
+    flex:none; min-width:60px; background:none; border:none; color:var(--ink-soft);
+    padding:9px 6px 8px; font-size:0.66rem; font-weight:500;
+    display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; white-space:nowrap;
+  }
+  nav.tabs button svg{ width:20px; height:20px; }
+  nav.tabs button.active{ color:var(--accent); }
+
+  @media (min-width:900px){
+    #app{ display:grid; grid-template-columns:220px 1fr; padding-bottom:24px; }
+    header.top{ grid-column:1 / -1; }
+    nav.tabs{
+      position:static; flex-direction:column; overflow-x:visible; border-top:none; border-right:1px solid var(--line);
+      padding:20px 10px; gap:2px; background:var(--paper);
+    }
+    nav.tabs button{ min-width:0; flex-direction:row; justify-content:flex-start; gap:10px; font-size:0.88rem; padding:10px 12px; border-radius:8px; }
+    nav.tabs button.active{ background:var(--accent-soft); }
+    main{ padding:24px 28px; }
+  }
+
+  section.tab{ display:none; flex-direction:column; gap:22px; }
+  section.tab.active{ display:flex; }
+
+  /* collapsed group for manual & flexible recurring items */
+  details.subgroup{ border-top:1px solid var(--line); }
+  details.subgroup summary{
+    padding:12px 16px; cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+    list-style:none; font-weight:600; font-size:0.9rem; color:var(--ink);
+  }
+  details.subgroup summary::-webkit-details-marker{ display:none; }
+  details.subgroup summary .chev{ display:inline-flex; color:var(--ink-soft); transition:transform 0.15s ease; }
+  details.subgroup[open] summary .chev{ transform:rotate(90deg); }
+  details.subgroup summary .meta{ font-weight:400; font-size:0.8rem; color:var(--ink-soft); }
+
+  .eyebrow{ text-transform:uppercase; letter-spacing:0.08em; font-size:0.72rem; color:var(--ink-soft); font-weight:600; }
+
+  /* tiles */
+  .tiles{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  @media (min-width:640px){ .tiles{ grid-template-columns:repeat(4,1fr); } }
+  .tile{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; }
+  .tile .label{ font-size:0.72rem; color:var(--ink-soft); font-weight:600; }
+  .tile .value{ font-size:1.5rem; font-weight:600; }
+  .tile .sub{ font-size:0.76rem; color:var(--ink-soft); }
+  .tile.warn .value{ color:var(--negative); }
+  .tile.good .value{ color:var(--accent); }
+
+  .panel{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .panel.suggest{ background:var(--gold-soft); border-color:var(--gold); }
+  .panel.suggest .name{ font-family:"Fraunces",serif; font-weight:600; }
+  .panel-head{ display:flex; align-items:baseline; justify-content:space-between; padding:14px 16px 10px; }
+  .panel-head h2{ font-size:1.05rem; }
+  .panel-head .meta{ font-size:0.8rem; color:var(--ink-soft); }
+
+  .row{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid var(--line); }
+  .row:first-of-type{ border-top:none; }
+  .row .main{ flex:1; min-width:0; }
+  .row .name{ font-weight:500; }
+  .row .tag{ font-size:0.76rem; color:var(--ink-soft); }
+  .row .amt{ font-weight:600; white-space:nowrap; }
+  .row .amt.neg{ color:var(--negative); }
+  .row .amt.pos{ color:var(--accent); }
+  .row .actions{ display:flex; gap:4px; flex:none; }
+  .row .actions button{ background:none; border:none; color:var(--ink-soft); cursor:pointer; padding:6px; border-radius:6px; }
+  .row .actions button:hover{ background:var(--accent-soft); color:var(--ink); }
+  .row .actions svg{ width:15px; height:15px; }
+
+  .chip{ display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .chip.overdue{ background:var(--negative-soft); color:var(--negative); }
+  .chip.soon{ background:var(--gold-soft); color:var(--gold); }
+  .chip.upcoming{ background:var(--line); color:var(--ink-soft); }
+  .chip.paid{ background:var(--accent-soft); color:var(--accent); }
+  .chip.recurring{ background:var(--gold-soft); color:var(--gold); }
+  .chip.scheduled{ background:var(--line); color:var(--ink-soft); }
+  .chip.completed{ background:var(--line); color:var(--ink-soft); }
+  .chip.stopped{ background:var(--line); color:var(--ink-soft); }
+  .name-btn{ background:none; border:none; padding:0; font:inherit; font-weight:500; color:inherit; cursor:pointer; text-align:left; }
+  .name-btn:hover{ text-decoration:underline; }
+  .btn.ghost.danger{ color:var(--negative); }
+  .chip.flexible{ background:var(--accent-soft); color:var(--accent); }
+  .row.muted{ opacity:0.55; }
+
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; padding:8px; border:1px solid var(--line); background:var(--paper); border-radius:8px; font-size:0.82rem; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+  .seg button.active{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+  .mini-bar{ background:var(--line); border-radius:5px; height:6px; overflow:hidden; margin-top:2px; }
+  .mini-bar-fill{ background:var(--accent); height:100%; border-radius:5px; }
+
+  .pie-wrap{ display:flex; gap:18px; align-items:center; padding:14px 16px; flex-wrap:wrap; }
+  .pie{ width:132px; height:132px; border-radius:50%; flex:none; }
+  .pie-legend{ display:flex; flex-direction:column; gap:7px; font-size:0.82rem; flex:1; min-width:140px; }
+  .legend-row{ display:flex; align-items:center; gap:8px; }
+  .legend-row .swatch{ width:10px; height:10px; border-radius:3px; flex:none; }
+  .legend-row .num{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; margin-left:auto; }
+  #dlg-report{ width:min(560px, 94vw); }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; padding:12px 14px; }
+  .cal-dow{ font-size:0.6rem; font-weight:700; text-transform:uppercase; color:var(--ink-soft); text-align:center; padding-bottom:2px; }
+  .cal-day{
+    aspect-ratio:1; border-radius:7px; background:var(--paper); border:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    cursor:pointer; font-size:0.68rem; padding:2px; overflow:hidden;
+  }
+  .cal-day:hover{ border-color:var(--ink-soft); }
+  .cal-day.empty{ visibility:hidden; cursor:default; }
+  .cal-day.has-spend{ background:var(--accent-soft); border-color:var(--accent); }
+  .cal-day .cal-daynum{ font-weight:600; }
+  .cal-day .cal-amt{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:0.6rem; color:var(--ink-soft); white-space:nowrap; }
+  .cal-month-label{ font-size:0.82rem; font-weight:600; padding:10px 14px 0; font-family:"Fraunces",serif; }
+
+  .empty{ padding:30px 16px; text-align:center; color:var(--ink-soft); font-size:0.88rem; }
+  .empty strong{ color:var(--ink); display:block; margin-bottom:4px; font-family:"Fraunces",serif; font-size:1.05rem; font-weight:600; }
+
+  /* bars */
+  .bars{ display:flex; flex-direction:column; gap:9px; padding:14px 16px 16px; }
+  .bar-row{ display:grid; grid-template-columns:100px 1fr 70px; align-items:center; gap:10px; font-size:0.8rem; }
+  .bar-row .cat{ color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar-track{ background:var(--line); border-radius:5px; height:8px; overflow:hidden; }
+  .bar-fill{ background:var(--accent); height:100%; border-radius:5px; }
+  .bar-row .val{ text-align:right; }
+
+  /* month nav */
+  .month-nav{ display:flex; align-items:center; gap:10px; }
+  .month-nav button{ background:none; border:1px solid var(--line); border-radius:8px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-soft); }
+  .month-nav button:hover{ color:var(--ink); border-color:var(--ink-soft); }
+  .month-nav svg{ width:15px; height:15px; }
+  .month-nav .label{ font-weight:600; min-width:118px; text-align:center; font-size:0.92rem; }
+
+  /* goal cards */
+  .goals{ display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:640px){ .goals{ grid-template-columns:1fr 1fr; } }
+  .goal{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .goal-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .goal-top .name{ font-family:"Fraunces",serif; font-weight:600; font-size:1.05rem; }
+  .goal-top .deadline{ font-size:0.74rem; color:var(--ink-soft); white-space:nowrap; }
+  .goal-track{ background:var(--line); border-radius:6px; height:10px; overflow:hidden; }
+  .goal-fill{ background:var(--accent); height:100%; border-radius:6px; }
+  .goal-figures{ display:flex; justify-content:space-between; font-size:0.85rem; }
+  .goal-figures .pct{ color:var(--accent); font-weight:600; }
+  .goal-actions{ display:flex; gap:8px; margin-top:2px; }
+  .goal-actions button{ flex:1; }
+
+  /* buttons */
+  .btn{ border:1px solid var(--line); background:var(--paper-raised); color:var(--ink); border-radius:9px; padding:9px 14px; font-size:0.86rem; font-weight:600; cursor:pointer; }
+  .btn:hover{ border-color:var(--ink-soft); }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  .btn.primary:hover{ opacity:0.92; }
+  .btn.ghost{ background:none; border:none; color:var(--ink-soft); }
+  .btn.small{ padding:6px 10px; font-size:0.78rem; }
+  .btn.danger{ color:var(--negative); }
+
+  .fab{
+    position:fixed; right:18px; bottom:calc(78px + env(safe-area-inset-bottom,0px)); z-index:15;
+    width:52px; height:52px; border-radius:16px; background:var(--accent); color:var(--paper);
+    border:none; box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .fab svg{ width:24px; height:24px; }
+  @media (min-width:900px){ .fab{ bottom:24px; } }
+
+  /* dialogs */
+  dialog{
+    border:none; border-radius:16px; padding:0; background:var(--paper-raised); color:var(--ink);
+    box-shadow:var(--shadow); width:min(440px, 92vw); max-height:88vh; overflow:auto;
+  }
+  dialog::backdrop{ background:rgba(20,17,12,0.45); backdrop-filter:blur(2px); }
+  .sheet{ display:flex; flex-direction:column; }
+  .sheet-head{ padding:18px 20px 6px; display:flex; justify-content:space-between; align-items:baseline; }
+  .sheet-head h3{ font-size:1.15rem; }
+  .sheet-body{ padding:8px 20px 4px; display:flex; flex-direction:column; gap:14px; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:0.76rem; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+  .field input, .field select, .field textarea{
+    font-family:inherit; font-size:0.95rem; padding:9px 11px; border-radius:8px;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .field.check{ flex-direction:row; align-items:center; gap:8px; }
+  .field.check input{ width:auto; }
+  .field.check label{ text-transform:none; letter-spacing:0; font-size:0.9rem; color:var(--ink); }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .sheet-foot{ padding:16px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
+
+  .sync-note{ font-size:0.78rem; color:var(--ink-soft); line-height:1.5; }
+  .sync-note strong{ color:var(--ink); }
+
+  @media (prefers-reduced-motion: no-preference){
+    .goal-fill, .bar-fill{ transition:width 0.4s ease; }
+  }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header class="top">
+    <div class="id">
+      <h1>Financer</h1>
+      <span class="date" id="today-label"></span>
+    </div>
+    <button class="gear" id="btn-settings" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.36.5.6.9.6H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <nav class="tabs" id="tabbar">
+    <button data-tab="overview" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Overview
+    </button>
+    <button data-tab="dues">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      Recurring
+    </button>
+    <button data-tab="investments">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>
+      Invest
+    </button>
+    <button data-tab="savings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 4 2 7v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2c0-3 2-4 2-7a7 7 0 0 0-7-7z"/><path d="M9 21h6M10 6.5a2 2 0 1 1 2.5 2"/></svg>
+      Savings
+    </button>
+
+    <button data-tab="groceries">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h16l-1.6 10.2A2 2 0 0 1 16.4 20H7.6a2 2 0 0 1-2-1.8L4 8z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg>
+      Groceries
+    </button>
+    <button data-tab="restaurants">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 2v7a2 2 0 0 0 4 0V2M9 9v13M16 2c-1.2 1-2 3-2 5s.8 3.5 2 4v11"/></svg>
+      Restaurants
+    </button>
+    <button data-tab="travel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>
+      Travel
+    </button>
+    <button data-tab="household">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-8 9 8"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg>
+      Household
+    </button>
+    <button data-tab="utilities">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 2 4 14h6l-1 8 10-12h-6l1-8z"/></svg>
+      Utilities
+    </button>
+    <button data-tab="misc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 21 11 12.5 21.5 3 12z"/><circle cx="8" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      Misc.
+    </button>
+  </nav>
+
+  <main>
+
+    <!-- OVERVIEW -->
+    <section class="tab active" id="tab-overview">
+      <div class="tiles">
+        <div class="tile good">
+          <span class="label">Net worth</span>
+          <span class="value num" id="ov-networth">—</span>
+          <span class="sub">investments + savings</span>
+        </div>
+        <div class="tile">
+          <span class="label">Spent this month</span>
+          <span class="value num" id="ov-spent">—</span>
+          <span class="sub" id="ov-spent-sub">—</span>
+        </div>
+        <div class="tile" id="ov-dues-tile">
+          <span class="label">Due in next 30 days</span>
+          <span class="value num" id="ov-duesoon">—</span>
+          <span class="sub" id="ov-duesoon-sub">—</span>
+        </div>
+        <div class="tile">
+          <span class="label">Savings rate</span>
+          <span class="value num" id="ov-rate">—</span>
+          <span class="sub" id="ov-rate-sub">—</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Due soon</h2><span class="meta">next three</span></div>
+        <div id="ov-due-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Where it went</h2><span class="meta" id="ov-cat-month">this month</span></div>
+        <div class="bars" id="ov-bars"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Reports</h2><span class="meta">recurring vs. everything else, by period</span></div>
+        <div style="display:flex; gap:8px; padding:0 16px 16px;">
+          <button type="button" class="btn small" style="flex:1;" data-report-period="week">Weekly</button>
+          <button type="button" class="btn small" style="flex:1;" data-report-period="month">Monthly</button>
+          <button type="button" class="btn small" style="flex:1;" data-report-period="year">Yearly</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- DUES / RECURRING -->
+    <section class="tab" id="tab-dues">
+      <div class="panel-head" style="padding:0;"><h2>Recurring payments</h2><span class="meta" id="dues-total">—</span></div>
+      <p class="sync-note" style="margin:-8px 2px 0;">
+        <strong>Fixed</strong> — a set amount on a set day, autopay or not, running forever or for a fixed number of months (an EMI that ends).
+        <strong>Flexible</strong> — amount and timing vary; log a payment whenever you actually make one. Either way, logging a payment records it as an expense too.
+      </p>
+      <div class="panel"><div id="dues-list"></div></div>
+    </section>
+
+    <!-- INVESTMENTS -->
+    <section class="tab" id="tab-investments">
+      <div class="tiles" style="grid-template-columns:repeat(3,1fr);">
+        <div class="tile"><span class="label">Invested</span><span class="value num" id="inv-invested">—</span></div>
+        <div class="tile"><span class="label">Current value</span><span class="value num" id="inv-current">—</span></div>
+        <div class="tile good"><span class="label">Gain / loss</span><span class="value num" id="inv-gain">—</span></div>
+      </div>
+      <div class="panel"><div id="investments-list"></div></div>
+    </section>
+
+    <!-- SAVINGS -->
+    <section class="tab" id="tab-savings">
+      <div class="panel-head" style="padding:0;"><h2>Savings goals</h2><span class="meta num" id="goals-total">—</span></div>
+      <div class="goals" id="goals-list"></div>
+    </section>
+
+    <!-- CATEGORY TABS: Groceries, Restaurants, Travel, Household, Utilities, Misc. share one layout -->
+    <section class="tab" id="tab-groceries">
+      <div class="panel-head" style="padding:0;"><h2>Groceries</h2><span class="meta num" id="cat-groceries-total">—</span></div>
+      <div class="panel"><div id="cat-groceries-list"></div></div>
+    </section>
+    <section class="tab" id="tab-restaurants">
+      <div class="panel-head" style="padding:0;"><h2>Restaurants</h2><span class="meta num" id="cat-restaurants-total">—</span></div>
+      <div class="panel"><div id="cat-restaurants-list"></div></div>
+    </section>
+    <section class="tab" id="tab-travel">
+      <div class="panel-head" style="padding:0;"><h2>Travel (non-subscribed)</h2><span class="meta num" id="cat-travel-total">—</span></div>
+      <div class="panel"><div id="cat-travel-list"></div></div>
+    </section>
+    <section class="tab" id="tab-household">
+      <div class="panel-head" style="padding:0;"><h2>Household</h2><span class="meta num" id="cat-household-total">—</span></div>
+      <div class="panel"><div id="cat-household-list"></div></div>
+    </section>
+    <section class="tab" id="tab-utilities">
+      <div class="panel-head" style="padding:0;"><h2>Utilities</h2><span class="meta num" id="cat-utilities-total">—</span></div>
+      <div class="panel"><div id="cat-utilities-list"></div></div>
+    </section>
+    <section class="tab" id="tab-misc">
+      <div class="panel-head" style="padding:0;"><h2>Miscellaneous</h2><span class="meta num" id="cat-misc-total">—</span></div>
+      <div id="misc-suggestions"></div>
+      <div class="panel"><div id="cat-misc-list"></div></div>
+    </section>
+
+  </main>
+
+  <button class="fab" id="fab" aria-label="Add">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+</div>
+
+<!-- DUE / RECURRING DIALOG -->
+<dialog id="dlg-due">
+  <form class="sheet" id="form-due">
+    <div class="sheet-head"><h3 id="due-dlg-title">Add a recurring payment</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <div class="field">
+        <label>Schedule</label>
+        <div class="seg" id="due-schedule-seg">
+          <button type="button" data-schedule="fixed" class="active">Fixed</button>
+          <button type="button" data-schedule="flexible">Flexible</button>
+        </div>
+      </div>
+      <input type="hidden" name="schedule" value="fixed">
+
+      <div class="field"><label>Name</label><input name="name" placeholder="what is this payment for?" required></div>
+      <div class="field"><label>Category</label>
+        <select name="category" id="due-category-select"></select>
+        <input name="categoryNew" id="due-category-new" placeholder="new category name" hidden>
+      </div>
+
+      <div id="due-fixed-fields">
+        <div class="two-col">
+          <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0"></div>
+          <div class="field"><label>Due day of month</label><input name="dueDay" type="number" min="1" max="31"></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Starts</label><input name="startMonth" type="month"></div>
+          <div class="field"><label>Runs for (months)</label><input name="termMonths" type="number" min="1" placeholder="blank = ongoing"></div>
+        </div>
+        <div class="field check"><input type="checkbox" name="autopay" id="due-autopay"><label for="due-autopay">Autopay is set up</label></div>
+      </div>
+
+      <div id="due-flexible-fields" hidden>
+        <div class="field"><label>Roughly how often</label>
+          <select name="cadence">
+            <option value="">No fixed schedule</option>
+            <option value="monthly">About every month</option>
+            <option value="alternate">About every other month</option>
+            <option value="occasional">Occasional / as needed</option>
+          </select>
+        </div>
+        <div class="field check"><input type="checkbox" name="trackBalance" id="due-track-balance"><label for="due-track-balance">Track a running balance (e.g. paying down a loan)</label></div>
+        <div class="field" id="due-original-amount-field" hidden><label>Total / original amount</label><input name="originalAmount" type="number" step="0.01" min="0"></div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn danger" id="due-delete" style="display:none;margin-right:auto;">Delete</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- LOG A FLEXIBLE PAYMENT -->
+<dialog id="dlg-logpayment">
+  <form class="sheet" id="form-logpayment">
+    <div class="sheet-head"><h3 id="logpayment-title">Log a payment</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <div class="two-col">
+        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
+        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+      </div>
+      <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Log payment</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- RECURRING PAYMENT DETAIL: tap a due's name to see its full history -->
+<dialog id="dlg-due-detail">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="due-detail-title">—</h3><button type="button" class="btn ghost small" data-close>Close</button></div>
+    <div class="sheet-body">
+      <div class="tag" id="due-detail-meta" style="margin-bottom:2px;"></div>
+      <div class="panel"><div id="due-detail-history"></div></div>
+    </div>
+    <div class="sheet-foot" id="due-detail-actions"></div>
+  </div>
+</dialog>
+
+<!-- EXPENSE DIALOG -->
+<dialog id="dlg-expense">
+  <form class="sheet" id="form-expense">
+    <div class="sheet-head"><h3 id="expense-dlg-title">Add an expense</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <input type="hidden" name="category">
+      <div class="two-col">
+        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
+      </div>
+      <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn danger" id="expense-delete" style="display:none;margin-right:auto;">Delete</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save expense</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- INVESTMENT DIALOG -->
+<dialog id="dlg-investment">
+  <form class="sheet" id="form-investment">
+    <div class="sheet-head"><h3 id="investment-dlg-title">Add a holding</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <div class="field"><label>Name</label><input name="name" placeholder="e.g. Nifty 50 Index Fund" required></div>
+      <div class="field"><label>Type</label>
+        <select name="type">
+          <option>Mutual Fund / SIP</option><option>Stocks</option><option>Fixed Deposit</option>
+          <option>PPF / EPF</option><option>Gold</option><option>Crypto</option><option>Other</option>
+        </select>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Invested</label><input name="invested" type="number" step="0.01" min="0" required></div>
+        <div class="field"><label>Current value</label><input name="currentValue" type="number" step="0.01" min="0" required></div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn danger" id="investment-delete" style="display:none;margin-right:auto;">Delete</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save holding</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- GOAL DIALOG -->
+<dialog id="dlg-goal">
+  <form class="sheet" id="form-goal">
+    <div class="sheet-head"><h3 id="goal-dlg-title">Add a savings goal</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <div class="field"><label>Name</label><input name="name" placeholder="e.g. Emergency fund, Iceland trip" required></div>
+      <div class="two-col">
+        <div class="field"><label>Target</label><input name="target" type="number" step="0.01" min="0" required></div>
+        <div class="field"><label>Current</label><input name="current" type="number" step="0.01" min="0" required></div>
+      </div>
+      <div class="field"><label>Target date</label><input name="deadline" type="date"></div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn danger" id="goal-delete" style="display:none;margin-right:auto;">Delete</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save goal</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- CONTRIBUTION DIALOG -->
+<dialog id="dlg-contribute">
+  <form class="sheet" id="form-contribute">
+    <div class="sheet-head"><h3>Add to goal</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <input type="hidden" name="id">
+      <div class="field"><label>Amount to add</label><input name="amount" type="number" step="0.01" required autofocus></div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Add</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- SETTINGS DIALOG -->
+<dialog id="dlg-settings">
+  <form class="sheet" id="form-settings">
+    <div class="sheet-head"><h3>Settings</h3><button type="button" class="btn ghost small" data-close>Close</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>Monthly income</label><input name="monthlyIncome" type="number" step="0.01" min="0"></div>
+      <div class="field">
+        <label>Incentives this month</label>
+        <div id="settings-incentives-list" class="panel" style="margin-top:2px;"></div>
+        <p class="sync-note" style="margin-top:4px;">Add one from the + button on Overview.</p>
+      </div>
+      <div class="field">
+        <label>Backup &amp; reset</label>
+        <div class="panel" style="padding:12px 14px; display:flex; flex-direction:column; gap:10px;">
+          <div class="two-col">
+            <div class="field"><label>Year</label><input type="number" id="backup-year" min="2000" max="2100"></div>
+            <div style="display:flex; align-items:flex-end;"><button type="button" class="btn small" id="btn-export-year" style="width:100%;">Export year</button></div>
+          </div>
+          <p class="sync-note" style="margin:0;">A full CSV snapshot for that year — every expense, plus a category and recurring/other summary, plus the current state of your recurring payments, investments, goals, and incentives.</p>
+          <button type="button" class="btn small ghost danger" id="btn-flush-data" style="align-self:flex-start;">Flush all app data…</button>
+        </div>
+      </div>
+      <p class="sync-note">
+        <strong>On this device only.</strong> Everything is saved in this browser's own storage —
+        nothing is sent to any server. That means it won't appear on another phone, iPad, or Mac,
+        and clearing Safari's website data for this page (or switching phones) would erase it.
+        Use Export in Reports occasionally if you want a backup you can keep elsewhere.
+      </p>
+    </div>
+    <div class="sheet-foot">
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- FLUSH CONFIRMATION -->
+<dialog id="dlg-flush-confirm">
+  <div class="sheet">
+    <div class="sheet-head"><h3>Erase everything?</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <p class="sync-note">
+        This permanently deletes every recurring payment, expense, investment, goal, and incentive
+        stored in this browser for this app, and resets settings back to default. There is no undo —
+        consider using Export year first if you want to keep a copy.
+      </p>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="button" class="btn danger" id="btn-flush-confirm-yes">Yes, erase everything</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- OVERVIEW QUICK LOG: an incentive, or a payment against any ongoing
+     recurring due — reached from the + button while on Overview -->
+<dialog id="dlg-quick-overview">
+  <form class="sheet" id="form-quick-overview">
+    <div class="sheet-head"><h3>Quick log</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <div class="field"><label>What is this for?</label>
+        <select name="target" id="quick-overview-target"></select>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
+        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+      </div>
+      <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Log</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- REPORTS: weekly / monthly / yearly breakdown -->
+<dialog id="dlg-report">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="report-title">Report</h3><button type="button" class="btn ghost small" data-close>Close</button></div>
+    <div class="sheet-body">
+      <div id="report-picker">
+        <div class="field" id="report-month-field"><label>Month</label><input type="month" id="report-month"></div>
+        <div class="field" id="report-week-field" hidden><label>Week</label><select id="report-week"></select></div>
+        <div class="field" id="report-year-field" hidden><label>Year</label><input type="number" id="report-year" min="2000" max="2100"></div>
+        <button type="button" class="btn primary" id="report-show" style="margin-top:4px;">Show</button>
+      </div>
+      <div id="report-breakdown" hidden>
+        <div class="panel-head" style="padding:0;"><h2 id="report-period-label">—</h2><span class="meta num" id="report-total">—</span></div>
+        <div class="panel" id="report-calendar-panel" style="margin-top:12px;"><div id="report-calendar"></div></div>
+        <div style="display:flex; gap:8px; margin:12px 0; flex-wrap:wrap;">
+          <button type="button" class="btn small ghost" id="report-change-period">Change period</button>
+          <button type="button" class="btn small ghost" id="report-toggle-pie">Pie chart</button>
+          <button type="button" class="btn small ghost" id="report-export">Export</button>
+        </div>
+        <div class="panel" id="report-pie" hidden></div>
+        <div class="panel"><div id="report-buckets"></div></div>
+        <div class="panel" id="report-detail-panel" hidden style="margin-top:14px;">
+          <div class="panel-head"><h2 id="report-detail-title">—</h2></div>
+          <div id="report-detail-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var state = {
+    dues: [], expenses: [], investments: [], goals: [], incomes: [],
+    settings: { currency: "€", monthlyIncome: 0 }
+  };
+  var LOCAL_KEY = "financer_v1";
+  var editingGoalId = null;
+
+  // ---------- persistence ----------
+  // Local-only, on purpose: everything lives in this browser's own storage
+  // on this device, never on a server. That means no cross-device sync —
+  // a deliberate trade chosen over the data living anywhere else.
+  function saveLocal(){ try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }catch(e){} }
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem(LOCAL_KEY);
+      if(raw){ var parsed = JSON.parse(raw); Object.assign(state, parsed); }
+    }catch(e){}
+  }
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+
+  function collOf(kind){
+    if(kind==="due") return "dues";
+    if(kind==="expense") return "expenses";
+    if(kind==="investment") return "investments";
+    if(kind==="goal") return "goals";
+    if(kind==="income") return "incomes";
+  }
+
+  async function addItem(kind, data){
+    var coll = collOf(kind);
+    data.id = uid(); state[coll].push(data); saveLocal(); renderAll();
+    return data.id;
+  }
+  async function updateItem(kind, id, data){
+    var coll = collOf(kind);
+    var i = state[coll].findIndex(function(x){ return x.id===id; });
+    if(i>-1) Object.assign(state[coll][i], data);
+    saveLocal(); renderAll();
+  }
+  async function deleteItem(kind, id){
+    var coll = collOf(kind);
+    state[coll] = state[coll].filter(function(x){ return x.id!==id; });
+    saveLocal(); renderAll();
+  }
+  async function saveSettings(data){
+    state.settings = Object.assign({}, state.settings, data);
+    saveLocal(); renderAll();
+  }
+
+  function initStore(){
+    loadLocal();
+    renderAll();
+  }
+
+  // ---------- helpers ----------
+  function fmt(n){
+    n = Number(n)||0;
+    var c = state.settings.currency || "€";
+    return c + Math.round(n).toLocaleString();
+  }
+  function monthKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+  function todayZero(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+  function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function nextDueDate(dueDay, today){
+    var y=today.getFullYear(), m=today.getMonth();
+    var daysInMonth = new Date(y, m+1, 0).getDate();
+    var day = Math.min(dueDay, daysInMonth);
+    return new Date(y, m, day);
+  }
+  function monthIndex(ym){
+    var p = String(ym||"").split("-");
+    return (parseInt(p[0],10)||0)*12 + (parseInt(p[1],10)||1);
+  }
+  // Where a fixed-schedule item stands relative to its optional start month
+  // and term length: not started yet, actively due, or its term has run out.
+  function fixedPhase(due){
+    var curYM = monthKey(new Date());
+    var startYM = due.startMonth || curYM;
+    var elapsed = monthIndex(curYM) - monthIndex(startYM) + 1;
+    if(elapsed < 1) return {phase:"scheduled", elapsed:elapsed};
+    if(due.termMonths && elapsed > Number(due.termMonths)) return {phase:"completed", elapsed:elapsed};
+    return {phase:"active", elapsed:elapsed, remaining: due.termMonths ? (Number(due.termMonths)-elapsed+1) : null};
+  }
+  // Unified status used for sorting and chip rendering across both schedule
+  // kinds. sortKey buckets: overdue/upcoming fixed items first (by urgency),
+  // then flexible items, then paid, then not-yet-started or finished ones,
+  // then stopped ones last of all regardless of schedule.
+  function recurringStatus(due){
+    if(due.status === "stopped"){
+      return {kind:"stopped", label:"Stopped", sortKey:40000};
+    }
+    if(due.schedule === "flexible"){
+      return {kind:"flexible", label: due.lastPaid ? "Last "+fmtShortDate(due.lastPaid) : "Not logged yet", sortKey:15000};
+    }
+    var ph = fixedPhase(due);
+    if(ph.phase === "scheduled") return {kind:"scheduled", label:"Starts "+fmtMonth(due.startMonth), sortKey:25000};
+    if(ph.phase === "completed") return {kind:"completed", label:"Completed", sortKey:30000};
+    var today = todayZero();
+    var mk = monthKey(today);
+    if(due.paidMonth === mk){ return {kind:"paid", label:"Paid", sortKey:20000}; }
+    var dd = nextDueDate(due.dueDay, today);
+    var diff = Math.round((dd - today)/86400000);
+    if(diff < 0) return {kind:"overdue", label:"Overdue " + Math.abs(diff) + "d", sortKey:diff};
+    if(diff <= 3) return {kind:"soon", label: diff===0 ? "Due today" : "Due in "+diff+"d", sortKey:diff};
+    return {kind:"upcoming", label:"Due in "+diff+"d", sortKey:diff};
+  }
+  function fmtMonth(ym){
+    if(!ym) return "";
+    var p = ym.split("-");
+    return new Date(parseInt(p[0],10), parseInt(p[1],10)-1, 1).toLocaleDateString(undefined,{month:"short",year:"numeric"});
+  }
+  function fmtShortDate(iso){
+    if(!iso) return "";
+    return new Date(iso+"T00:00:00").toLocaleDateString(undefined,{day:"2-digit",month:"short"});
+  }
+  function sortedDues(){
+    return state.dues.slice().sort(function(a,b){
+      return recurringStatus(a).sortKey - recurringStatus(b).sortKey;
+    });
+  }
+  function svgTrash(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>'; }
+  function svgEdit(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>'; }
+  function esc(s){ var d=document.createElement("div"); d.textContent = s==null?"":s; return d.innerHTML; }
+
+  // Logging a fixed due as paid also drops a matching expense entry for the
+  // same month, dated today, so it shows up in the spend total and category
+  // breakdown without being entered twice.
+  async function logDuePaid(dueId){
+    var due = state.dues.find(function(d){ return d.id===dueId; });
+    if(!due) return;
+    var mk = monthKey(new Date());
+    await updateItem("due", dueId, {paidMonth: mk});
+    await addItem("expense", {
+      date: todayISO(), amount: Number(due.amount)||0, category: due.category,
+      note: due.name, recurring: true, dueId: dueId, dueMonth: mk
+    });
+  }
+  // A flexible item has no fixed amount or day: each payment is logged by
+  // hand, with its own amount and date, and optionally chips away at a
+  // tracked running balance (e.g. a loan being paid off).
+  async function logFlexiblePayment(dueId, amount, date, note){
+    var due = state.dues.find(function(d){ return d.id===dueId; });
+    if(!due) return;
+    await addItem("expense", {
+      date: date, amount: amount, category: due.category,
+      note: due.name + (note ? " — " + note : ""), recurring: true, dueId: dueId
+    });
+    var patch = { lastPaid: date };
+    if(due.trackBalance){ patch.paidTotal = (Number(due.paidTotal)||0) + amount; }
+    await updateItem("due", dueId, patch);
+  }
+  // Autopay means the bank deducts it whether or not this app is open, so
+  // there's nothing to confirm — once the due date has arrived, it logs
+  // itself the same way a manual "Mark paid" tap would. This only runs
+  // when the page happens to be open on or after that date (there's no
+  // background job), so it catches up whenever you next open the app.
+  // autoLoggedThisSession guards against firing twice before the write
+  // this same call makes has come back through the snapshot.
+  var autoLoggedThisSession = {};
+  function autoLogAutopayDues(){
+    var today = todayZero();
+    var mk = monthKey(today);
+    state.dues.forEach(function(d){
+      if(d.schedule==="flexible" || d.status==="stopped" || !d.autopay) return;
+      if(fixedPhase(d).phase!=="active") return;
+      if(d.paidMonth===mk) return;
+      if(nextDueDate(d.dueDay, today) > today) return;
+      var flag = d.id+"|"+mk;
+      if(autoLoggedThisSession[flag]) return;
+      autoLoggedThisSession[flag] = true;
+      logDuePaid(d.id);
+    });
+  }
+  // A small starting set of categories common to daily life and likely to
+  // recur monthly. Anything else typed through "Add new category" folds
+  // permanently into this same list from then on (it lives in whatever due
+  // or expense first used it, so it reappears on every future dropdown).
+  var BASE_CATEGORIES = ["Rent","Groceries","Restaurants","Travel (non-subscribed)","Household","Utilities","Transport","Subscriptions","Health","Insurance","Miscellaneous"];
+  // These have their own dedicated tabs, so offering them again in the
+  // Recurring payment dropdown would just be a redundant second path to
+  // the same category — excluded there, but still valid on Expenses (an
+  // entry logged through its tab still needs to be editable by category).
+  var CATEGORY_TABS = {
+    groceries:"Groceries", restaurants:"Restaurants", travel:"Travel (non-subscribed)",
+    household:"Household", utilities:"Utilities", misc:"Miscellaneous"
+  };
+  var CATEGORY_TAB_LABELS = Object.keys(CATEGORY_TABS).map(function(k){ return CATEGORY_TABS[k]; });
+  function allCategories(exclude){
+    var excludeSet = {};
+    (exclude||[]).forEach(function(c){ excludeSet[c]=1; });
+    var set = {};
+    BASE_CATEGORIES.forEach(function(c){ if(!excludeSet[c]) set[c]=1; });
+    state.dues.forEach(function(d){ if(d.category && !excludeSet[d.category]) set[d.category]=1; });
+    state.expenses.forEach(function(e){ if(e.category && !excludeSet[e.category]) set[e.category]=1; });
+    return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+  }
+  function populateCategorySelect(sel, current, exclude){
+    var cats = allCategories(exclude);
+    // Never drop the item's own existing category, even if it's since
+    // been excluded — editing it shouldn't silently reassign it.
+    if(current && cats.indexOf(current)===-1){ cats = [current].concat(cats); }
+    sel.innerHTML = cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join("") +
+      '<option value="__new__">+ Add new category…</option>';
+    sel.value = current || cats[0];
+  }
+  function wireCategorySelect(selId, textId){
+    var sel = document.getElementById(selId), text = document.getElementById(textId);
+    sel.addEventListener("change", function(){
+      var isNew = sel.value === "__new__";
+      text.hidden = !isNew;
+      text.required = isNew;
+      if(isNew){ text.value = ""; text.focus(); }
+    });
+  }
+  function resolvedCategory(sel, text){
+    return sel.value === "__new__" ? text.value.trim() : sel.value;
+  }
+  wireCategorySelect("due-category-select", "due-category-new");
+
+  function expensesInMonth(d){
+    var mk = monthKey(d);
+    return state.expenses.filter(function(e){ return (e.date||"").slice(0,7) === mk; });
+  }
+  function categoryTotals(list){
+    var map = {};
+    list.forEach(function(e){ map[e.category||"Other"] = (map[e.category||"Other"]||0) + (Number(e.amount)||0); });
+    return Object.keys(map).map(function(k){ return {category:k, total:map[k]}; }).sort(function(a,b){ return b.total-a.total; });
+  }
+
+  // ---------- render ----------
+  function renderAll(){
+    renderHeader();
+    renderOverview();
+    renderDues();
+    renderInvestments();
+    renderSavings();
+    renderCategoryTabs();
+    autoLogAutopayDues();
+  }
+
+  // Each category tab (Groceries, Restaurants, Travel, Household, Utilities,
+  // Misc.) is just the expense log filtered to that one category, with its
+  // own running total. The edit button on every row carries its own
+  // category as data-cat, so one delegated click handler on #app covers
+  // all of them.
+  function categoryRowsHtml(category, items){
+    return items.map(function(e){
+      var d = e.date ? new Date(e.date+"T00:00:00") : null;
+      var dl = d ? d.toLocaleDateString(undefined,{day:"2-digit", month:"short", year:"numeric"}) : "";
+      return '<div class="row">' +
+        '<div class="main"><div class="name">'+esc(e.note || category)+'</div><div class="tag">'+dl+'</div></div>' +
+        '<span class="amt neg num">-'+fmt(e.amount)+'</span>' +
+        '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
+    }).join("");
+  }
+  function renderCategoryList(slug, category){
+    var items = state.expenses.filter(function(e){ return e.category===category; })
+      .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var monthTotal = expensesInMonth(new Date()).filter(function(e){ return e.category===category; })
+      .reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
+    document.getElementById("cat-"+slug+"-total").textContent = fmt(monthTotal) + " this month";
+    var el = document.getElementById("cat-"+slug+"-list");
+    el.innerHTML = items.length ? categoryRowsHtml(category, items) :
+      '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add a '+esc(category.toLowerCase())+' expense.</div>';
+  }
+  function renderCategoryTabs(){
+    Object.keys(CATEGORY_TABS).forEach(function(slug){ renderCategoryList(slug, CATEGORY_TABS[slug]); });
+    renderMiscSuggestions();
+  }
+
+  // A Miscellaneous note that shows up 3+ times a month, three months in a
+  // row, is probably a real recurring thing (a subscription, a habit) that
+  // deserves its own category rather than being lumped into Miscellaneous.
+  // Multiple same-day entries for the same note are fine and each count.
+  function detectMiscCandidates(){
+    var groups = {};
+    state.expenses.forEach(function(e){
+      if(e.category !== "Miscellaneous") return;
+      var note = (e.note||"").trim();
+      var ym = (e.date||"").slice(0,7);
+      if(!note || !ym) return;
+      var key = note.toLowerCase();
+      if(!groups[key]) groups[key] = { label: note, byMonth: {} };
+      groups[key].label = note;
+      groups[key].byMonth[ym] = (groups[key].byMonth[ym]||0) + 1;
+    });
+    var dismissed = state.settings.dismissedMiscTags || [];
+    var out = [];
+    Object.keys(groups).forEach(function(key){
+      if(dismissed.indexOf(key)>-1) return;
+      var qualifying = Object.keys(groups[key].byMonth)
+        .filter(function(ym){ return groups[key].byMonth[ym] >= 3; })
+        .sort();
+      for(var i=0;i+2<qualifying.length;i++){
+        var a = monthIndex(qualifying[i]);
+        if(monthIndex(qualifying[i+1])===a+1 && monthIndex(qualifying[i+2])===a+2){
+          out.push({ key:key, label:groups[key].label });
+          break;
+        }
+      }
+    });
+    return out;
+  }
+  function renderMiscSuggestions(){
+    lastMiscCandidates = detectMiscCandidates();
+    var el = document.getElementById("misc-suggestions");
+    if(!el) return;
+    if(lastMiscCandidates.length===0){ el.innerHTML = ""; return; }
+    el.innerHTML = lastMiscCandidates.map(function(c){
+      return '<div class="panel suggest">' +
+        '<div class="row" style="border-top:none;align-items:flex-start;">' +
+          '<div class="main"><div class="name">"'+esc(c.label)+'" keeps coming up</div>' +
+          '<div class="tag">Logged 3+ times a month, three months running, under Miscellaneous.</div></div>' +
+          '<div class="actions" style="gap:8px;">' +
+            '<button class="btn small primary" data-promote-misc="'+esc(c.key)+'">Make it a recurring payment</button>' +
+            '<button class="btn small ghost" data-dismiss-misc="'+esc(c.key)+'">Not now</button>' +
+          '</div>' +
+        '</div></div>';
+    }).join("");
+  }
+
+  function renderHeader(){
+    var el = document.getElementById("today-label");
+    el.textContent = new Date().toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+    document.querySelector('[name="monthlyIncome"]').value = state.settings.monthlyIncome || "";
+    var yearEl = document.getElementById("backup-year");
+    if(!yearEl.value) yearEl.value = String(new Date().getFullYear());
+    renderIncentivesList();
+  }
+  function renderIncentivesList(){
+    var mk = monthKey(new Date());
+    var items = state.incomes.filter(function(i){ return (i.date||"").slice(0,7)===mk; })
+      .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var el = document.getElementById("settings-incentives-list");
+    el.innerHTML = items.length ? items.map(function(i){
+      var d = i.date ? new Date(i.date+"T00:00:00") : null;
+      var dl = d ? d.toLocaleDateString(undefined,{day:"2-digit",month:"short"}) : "";
+      return '<div class="row"><div class="main"><div class="name">'+esc(i.note||"Incentive")+'</div><div class="tag">'+dl+'</div></div>' +
+        '<span class="amt pos num">+'+fmt(i.amount)+'</span>' +
+        '<div class="actions"><button data-delete-incentive="'+i.id+'" aria-label="Delete">'+svgTrash()+'</button></div></div>';
+    }).join("") : '<div class="empty">None logged this month.</div>';
+  }
+
+  function renderOverview(){
+    var netInvest = state.investments.reduce(function(s,i){ return s+(Number(i.currentValue)||0); },0);
+    var netGoals = state.goals.reduce(function(s,g){ return s+(Number(g.current)||0); },0);
+    document.getElementById("ov-networth").textContent = fmt(netInvest+netGoals);
+
+    var thisMonthExpenses = expensesInMonth(new Date());
+    var spent = thisMonthExpenses.reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
+    document.getElementById("ov-spent").textContent = fmt(spent);
+    document.getElementById("ov-spent-sub").textContent = new Date().toLocaleDateString(undefined,{month:"long"});
+
+    var fixedActive = state.dues.filter(function(d){ return d.schedule!=="flexible" && d.status!=="stopped" && fixedPhase(d).phase==="active"; });
+    var in30 = fixedActive.filter(function(d){
+      var st = recurringStatus(d);
+      return st.kind!=="paid" && st.sortKey <= 30;
+    });
+    var duesTotal = in30.reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+    document.getElementById("ov-duesoon").textContent = fmt(duesTotal);
+    document.getElementById("ov-duesoon-sub").textContent = in30.length + (in30.length===1 ? " due" : " dues");
+    document.getElementById("ov-dues-tile").className = "tile" + (in30.some(function(d){return recurringStatus(d).kind==="overdue";}) ? " warn" : "");
+
+    var mi = Number(state.settings.monthlyIncome)||0;
+    var incentivesThisMonth = state.incomes.filter(function(i){ return (i.date||"").slice(0,7)===monthKey(new Date()); })
+      .reduce(function(s,i){ return s+(Number(i.amount)||0); },0);
+    var incomeTotal = mi + incentivesThisMonth;
+    var duesThisMonthTotal = fixedActive.reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+    if(incomeTotal > 0){
+      var rate = ((incomeTotal - spent - duesThisMonthTotal) / incomeTotal) * 100;
+      document.getElementById("ov-rate").textContent = Math.round(rate) + "%";
+      document.getElementById("ov-rate-sub").textContent = "of " + fmt(incomeTotal) + " income" + (incentivesThisMonth>0 ? " (+"+fmt(incentivesThisMonth)+" incentive)" : "");
+    } else {
+      document.getElementById("ov-rate").textContent = "—";
+      document.getElementById("ov-rate-sub").textContent = "set income in settings";
+    }
+
+    var upcoming = fixedActive.slice().sort(function(a,b){ return recurringStatus(a).sortKey - recurringStatus(b).sortKey; })
+      .filter(function(d){ return recurringStatus(d).kind!=="paid"; }).slice(0,3);
+    var listEl = document.getElementById("ov-due-list");
+    if(upcoming.length===0){
+      listEl.innerHTML = '<div class="empty"><strong>All caught up</strong>No fixed dues waiting on you right now.</div>';
+    } else {
+      listEl.innerHTML = upcoming.map(function(d){
+        var st = recurringStatus(d);
+        return '<div class="row"><div class="main"><div class="name">'+esc(d.name)+'</div><div class="tag">'+esc(d.category)+'</div></div>' +
+          '<span class="chip '+st.kind+'">'+st.label+'</span>' +
+          '<span class="amt num">'+fmt(d.amount)+'</span></div>';
+      }).join("");
+    }
+
+    var cats = categoryTotals(thisMonthExpenses);
+    document.getElementById("ov-cat-month").textContent = new Date().toLocaleDateString(undefined,{month:"long"});
+    renderBars("ov-bars", cats, spent);
+  }
+
+  function renderBars(elId, cats, total){
+    var el = document.getElementById(elId);
+    if(cats.length===0){ el.innerHTML = '<div class="empty">No expenses logged yet.</div>'; return; }
+    var max = Math.max.apply(null, cats.map(function(c){return c.total;}));
+    el.innerHTML = cats.map(function(c){
+      var pct = max>0 ? (c.total/max*100) : 0;
+      return '<div class="bar-row"><span class="cat">'+esc(c.category)+'</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div>' +
+        '<span class="val num">'+fmt(c.total)+'</span></div>';
+    }).join("");
+  }
+
+  // One row for a recurring item, shaped differently for a fixed-schedule
+  // due (amount, day, status chip, mark-paid) versus a flexible one (no
+  // fixed amount/day; a log-payment action and, if tracked, a balance bar).
+  // The name itself opens the detail view (full history); the pencil opens
+  // the quick edit; a stopped due swaps its action for Resume.
+  function recurringRow(d, payLabel){
+    var st = recurringStatus(d);
+    var muted = (st.kind==="completed" || st.kind==="scheduled" || st.kind==="stopped") ? " muted" : "";
+    var nameHtml = '<button class="name-btn" data-open-due="'+d.id+'">'+esc(d.name)+'</button>';
+    var actionBtn = st.kind==="stopped"
+      ? '<button class="btn small" data-resume-due="'+d.id+'">Resume</button>'
+      : "";
+    if(d.schedule === "flexible"){
+      var cadenceLabel = {monthly:"~monthly", alternate:"~alternate months", occasional:"occasional"}[d.cadence] || "as needed";
+      var balanceHtml = "";
+      if(d.trackBalance){
+        var total = Number(d.originalAmount)||0;
+        var paid = Number(d.paidTotal)||0;
+        var pct = total>0 ? Math.min(100,(paid/total)*100) : 0;
+        balanceHtml = '<div style="margin-top:6px;"><div class="mini-bar"><div class="mini-bar-fill" style="width:'+pct+'%"></div></div>' +
+          '<div class="tag" style="margin-top:3px;">'+fmt(paid)+' of '+fmt(total)+' paid</div></div>';
+      }
+      if(st.kind!=="stopped") actionBtn = '<button class="btn small" data-log-flex="'+d.id+'">'+payLabel+'</button>';
+      return '<div class="row'+muted+'" style="align-items:flex-start;">' +
+        '<div class="main"><div class="name">'+nameHtml+'</div><div class="tag">'+esc(d.category)+' · '+cadenceLabel+'</div>'+balanceHtml+'</div>' +
+        '<span class="chip '+st.kind+'">'+st.label+'</span>' +
+        '<div class="actions">' + actionBtn +
+          '<button data-edit-due="'+d.id+'" aria-label="Edit">'+svgEdit()+'</button>' +
+        '</div></div>';
+    }
+    var tag = esc(d.category) + " · day " + d.dueDay + (d.autopay ? " · autopay" : "");
+    if(d.termMonths){
+      var ph = fixedPhase(d);
+      tag += ph.remaining!=null ? " · " + Math.max(ph.elapsed,1) + "/" + d.termMonths : "";
+    }
+    if(st.kind!=="stopped" && st.kind!=="paid" && st.kind!=="completed" && st.kind!=="scheduled"){
+      actionBtn = '<button class="btn small" data-mark-paid="'+d.id+'">'+payLabel+'</button>';
+    }
+    return '<div class="row'+muted+'">' +
+      '<div class="main"><div class="name">'+nameHtml+'</div><div class="tag">'+tag+'</div></div>' +
+      '<span class="chip '+st.kind+'">'+st.label+'</span>' +
+      '<span class="amt num">'+fmt(d.amount)+'</span>' +
+      '<div class="actions">' + actionBtn +
+        '<button data-edit-due="'+d.id+'" aria-label="Edit">'+svgEdit()+'</button>' +
+      '</div></div>';
+  }
+
+  function svgChevron(){ return '<svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>'; }
+
+  // Fixed-schedule items render flat and sorted by urgency; flexible ones
+  // (irregular manual payments — a transfer to someone, an EMI paid off
+  // whenever) are grouped together under one collapsed disclosure, since
+  // they don't compete for attention the way a due date does.
+  function recurringGroupsHtml(payLabel){
+    var fixedList = sortedDues().filter(function(d){ return d.schedule!=="flexible"; });
+    var flexList = state.dues.filter(function(d){ return d.schedule==="flexible"; })
+      .sort(function(a,b){ return (b.lastPaid||"").localeCompare(a.lastPaid||"") || a.name.localeCompare(b.name); });
+    if(!fixedList.length && !flexList.length) return null;
+    var html = fixedList.map(function(d){ return recurringRow(d, payLabel); }).join("");
+    if(flexList.length){
+      html += '<details class="subgroup">' +
+        '<summary><span style="display:flex;align-items:center;gap:6px;">'+svgChevron()+'Manual &amp; flexible</span>' +
+        '<span class="meta">'+flexList.length+(flexList.length===1?' item':' items')+'</span></summary>' +
+        flexList.map(function(d){ return recurringRow(d, payLabel); }).join("") +
+        '</details>';
+    }
+    return html;
+  }
+
+  function renderDues(){
+    var monthlyFixed = state.dues.filter(function(d){ return d.schedule!=="flexible" && d.status!=="stopped" && fixedPhase(d).phase==="active"; })
+      .reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+    document.getElementById("dues-total").textContent = state.dues.length + (state.dues.length===1?" item":" items") + " · " + fmt(monthlyFixed) + "/mo fixed";
+    var el = document.getElementById("dues-list");
+    var html = recurringGroupsHtml("Mark paid");
+    el.innerHTML = html || '<div class="empty"><strong>Nothing set up yet</strong>Tap + to add an autopay subscription, a fixed-term EMI, or a flexible manual payment.</div>';
+  }
+
+  function renderInvestments(){
+    var invested = state.investments.reduce(function(s,i){ return s+(Number(i.invested)||0); },0);
+    var current = state.investments.reduce(function(s,i){ return s+(Number(i.currentValue)||0); },0);
+    var gain = current - invested;
+    document.getElementById("inv-invested").textContent = fmt(invested);
+    document.getElementById("inv-current").textContent = fmt(current);
+    var gEl = document.getElementById("inv-gain");
+    gEl.textContent = (gain>=0?"+":"") + fmt(gain);
+    gEl.parentElement.className = "tile " + (gain>=0 ? "good" : "warn");
+
+    var el = document.getElementById("investments-list");
+    if(state.investments.length===0){
+      el.innerHTML = '<div class="empty"><strong>No holdings tracked yet</strong>Add SIPs, stocks, FDs, or anything else you invest in.</div>';
+      return;
+    }
+    el.innerHTML = state.investments.map(function(i){
+      var g = (Number(i.currentValue)||0) - (Number(i.invested)||0);
+      var pct = i.invested>0 ? (g/i.invested*100) : 0;
+      return '<div class="row">' +
+        '<div class="main"><div class="name">'+esc(i.name)+'</div><div class="tag">'+esc(i.type)+' · invested '+fmt(i.invested)+'</div></div>' +
+        '<span class="amt '+(g>=0?'pos':'neg')+' num">'+(g>=0?'+':'')+fmt(g)+' <span style="font-weight:400;font-size:0.78em;">('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</span></span>' +
+        '<div class="actions"><button data-edit-investment="'+i.id+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
+    }).join("");
+  }
+
+  function renderSavings(){
+    var total = state.goals.reduce(function(s,g){ return s+(Number(g.current)||0); },0);
+    document.getElementById("goals-total").textContent = fmt(total) + " saved";
+    var el = document.getElementById("goals-list");
+    if(state.goals.length===0){
+      el.innerHTML = '<div class="empty"><strong>No goals yet</strong>Tap + to start one — an emergency fund, a trip, anything.</div>';
+      return;
+    }
+    el.innerHTML = state.goals.map(function(g){
+      var pct = g.target>0 ? Math.min(100, (g.current/g.target)*100) : 0;
+      var daysLeft = g.deadline ? Math.round((new Date(g.deadline+"T00:00:00") - todayZero())/86400000) : null;
+      var deadlineTxt = g.deadline ? (daysLeft>=0 ? daysLeft+"d left" : "past target") : "no target date";
+      return '<div class="goal">' +
+        '<div class="goal-top"><span class="name">'+esc(g.name)+'</span><span class="deadline">'+deadlineTxt+'</span></div>' +
+        '<div class="goal-track"><div class="goal-fill" style="width:'+pct+'%"></div></div>' +
+        '<div class="goal-figures"><span class="num">'+fmt(g.current)+' of '+fmt(g.target)+'</span><span class="pct">'+pct.toFixed(0)+'%</span></div>' +
+        '<div class="goal-actions"><button class="btn small" data-contribute="'+g.id+'">Add funds</button><button class="btn small ghost" data-edit-goal="'+g.id+'">Edit</button></div>' +
+      '</div>';
+    }).join("");
+  }
+
+  // ---------- tabs ----------
+  var activeTab = "overview";
+  function switchTab(name){
+    activeTab = name;
+    document.querySelectorAll("nav.tabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===name); });
+    document.querySelectorAll("section.tab").forEach(function(s){ s.classList.toggle("active", s.id==="tab-"+name); });
+  }
+  document.getElementById("tabbar").addEventListener("click", function(e){
+    var tabBtn = e.target.closest("button[data-tab]");
+    if(tabBtn) switchTab(tabBtn.dataset.tab);
+  });
+
+  // ---------- dialogs: open/close ----------
+  function openDlg(id){ document.getElementById(id).showModal(); }
+  function closeDlg(el){ el.closest("dialog").close(); }
+  document.querySelectorAll("[data-close]").forEach(function(b){
+    b.addEventListener("click", function(){ closeDlg(b); });
+  });
+
+  // FAB opens the relevant add-dialog for the active tab. On Overview it's
+  // the quick-log chooser (incentive or an existing recurring payment); on
+  // a category tab it's the same expense dialog everyone else uses, just
+  // with that category preselected.
+  document.getElementById("fab").addEventListener("click", function(){
+    if(activeTab==="overview") openQuickOverviewDialog();
+    else if(activeTab==="dues") openDueDialog(null);
+    else if(activeTab==="investments") openInvestmentDialog(null);
+    else if(activeTab==="savings") openGoalDialog(null);
+    else if(CATEGORY_TABS[activeTab]) openExpenseDialog(null, CATEGORY_TABS[activeTab]);
+  });
+
+  document.getElementById("btn-settings").addEventListener("click", function(){ openDlg("dlg-settings"); });
+
+  // ---------- DUE / RECURRING form ----------
+  function setDueSchedule(sched){
+    var f = document.getElementById("form-due");
+    f.schedule.value = sched;
+    document.querySelectorAll("#due-schedule-seg button").forEach(function(b){
+      b.classList.toggle("active", b.dataset.schedule===sched);
+    });
+    document.getElementById("due-fixed-fields").hidden = sched!=="fixed";
+    document.getElementById("due-flexible-fields").hidden = sched!=="flexible";
+    f.amount.required = sched==="fixed";
+    f.dueDay.required = sched==="fixed";
+  }
+  document.getElementById("due-schedule-seg").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-schedule]");
+    if(b) setDueSchedule(b.dataset.schedule);
+  });
+  document.getElementById("due-track-balance").addEventListener("change", function(){
+    document.getElementById("due-original-amount-field").hidden = !this.checked;
+  });
+
+  // prefill lets the Miscellaneous suggestion open this same dialog with
+  // name/category/schedule already filled in, rather than a special form
+  // of its own — see promoteMiscTag.
+  function openDueDialog(due, prefill){
+    pendingMiscPromotionKey = null;
+    var f = document.getElementById("form-due");
+    f.reset();
+    f.id.value = due ? due.id : "";
+    document.getElementById("due-dlg-title").textContent = due ? "Edit recurring payment" : "Add a recurring payment";
+    document.getElementById("due-delete").style.display = due ? "" : "none";
+    setDueSchedule(due ? (due.schedule||"fixed") : (prefill ? prefill.schedule : "fixed"));
+    document.getElementById("due-original-amount-field").hidden = !(due && due.trackBalance);
+    document.getElementById("due-category-new").hidden = true;
+    document.getElementById("due-category-new").required = false;
+    populateCategorySelect(document.getElementById("due-category-select"), due ? due.category : (prefill ? prefill.category : null), CATEGORY_TAB_LABELS);
+    if(due){
+      f.name.value = due.name;
+      if(due.schedule==="flexible"){
+        f.cadence.value = due.cadence||"";
+        f.trackBalance.checked = !!due.trackBalance;
+        f.originalAmount.value = due.originalAmount||"";
+      } else {
+        f.amount.value = due.amount; f.dueDay.value = due.dueDay;
+        f.startMonth.value = due.startMonth||""; f.termMonths.value = due.termMonths||"";
+        f.autopay.checked = !!due.autopay;
+      }
+    } else {
+      f.startMonth.value = monthKey(new Date());
+      if(prefill) f.name.value = prefill.name;
+    }
+    openDlg("dlg-due");
+  }
+  document.getElementById("form-due").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var sched = f.schedule.value;
+    var category = resolvedCategory(document.getElementById("due-category-select"), document.getElementById("due-category-new"));
+    if(!category){ document.getElementById("due-category-new").focus(); return; }
+    var data = { name: f.name.value.trim(), category: category, schedule: sched };
+    if(sched === "flexible"){
+      data.cadence = f.cadence.value;
+      data.trackBalance = f.trackBalance.checked;
+      data.originalAmount = f.trackBalance.checked ? (parseFloat(f.originalAmount.value)||0) : null;
+    } else {
+      data.amount = parseFloat(f.amount.value)||0;
+      data.dueDay = parseInt(f.dueDay.value,10)||1;
+      data.startMonth = f.startMonth.value || monthKey(new Date());
+      data.termMonths = f.termMonths.value ? (parseInt(f.termMonths.value,10)||null) : null;
+      data.autopay = f.autopay.checked;
+    }
+    var id = f.id.value;
+    // Editing (including via the Resume button, which just opens this same
+    // edit dialog) always reactivates a stopped due — there's no separate
+    // "resume" mutation, editing and resuming are the same action.
+    if(id) data.status = "active";
+    var promoKey = pendingMiscPromotionKey;
+    pendingMiscPromotionKey = null;
+    (id ? updateItem("due", id, data) : addItem("due", data)).then(async function(newId){
+      f.closest("dialog").close();
+      if(!id && promoKey){
+        var matches = state.expenses.filter(function(x){
+          return x.category==="Miscellaneous" && (x.note||"").trim().toLowerCase()===promoKey;
+        });
+        for(var i=0;i<matches.length;i++){
+          await updateItem("expense", matches[i].id, {category: category, dueId: newId});
+        }
+      }
+    });
+  });
+  document.getElementById("due-delete").addEventListener("click", function(){
+    var id = document.getElementById("form-due").id.value;
+    if(id) deleteItem("due", id).then(function(){ document.getElementById("dlg-due").close(); });
+  });
+
+  // ---------- LOG A FLEXIBLE PAYMENT form ----------
+  function openLogPaymentDialog(dueId){
+    var due = state.dues.find(function(d){ return d.id===dueId; });
+    if(!due) return;
+    var f = document.getElementById("form-logpayment");
+    f.reset();
+    f.id.value = dueId;
+    f.date.value = todayISO();
+    document.getElementById("logpayment-title").textContent = "Log a payment — " + due.name;
+    openDlg("dlg-logpayment");
+  }
+  document.getElementById("form-logpayment").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var amount = parseFloat(f.amount.value)||0;
+    logFlexiblePayment(f.id.value, amount, f.date.value, f.note.value.trim()).then(function(){ f.closest("dialog").close(); });
+  });
+
+  // ---------- DUE DETAIL (full history for one recurring payment) ----------
+  async function stopDue(id){ await updateItem("due", id, {status:"stopped"}); }
+  function openDueDetail(dueId){
+    var due = state.dues.find(function(d){ return d.id===dueId; });
+    if(!due) return;
+    var st = recurringStatus(due);
+    document.getElementById("due-detail-title").textContent = due.name;
+    var metaParts = [due.category];
+    if(due.schedule==="flexible") metaParts.push("flexible");
+    else { metaParts.push("day "+due.dueDay); if(due.autopay) metaParts.push("autopay"); }
+    document.getElementById("due-detail-meta").innerHTML =
+      esc(metaParts.join(" · ")) + ' <span class="chip '+st.kind+'" style="margin-left:4px;">'+st.label+'</span>';
+
+    var history = state.expenses.filter(function(e){ return e.dueId===due.id; })
+      .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var histEl = document.getElementById("due-detail-history");
+    histEl.innerHTML = history.length ? history.map(function(e){
+      var d = e.date ? new Date(e.date+"T00:00:00") : null;
+      var dl = d ? d.toLocaleDateString(undefined,{day:"2-digit", month:"short", year:"numeric"}) : "";
+      return '<div class="row"><div class="main"><div class="name">'+esc(e.note||due.name)+'</div><div class="tag">'+dl+'</div></div>' +
+        '<span class="amt neg num">-'+fmt(e.amount)+'</span></div>';
+    }).join("") : '<div class="empty">No payments logged yet.</div>';
+
+    var actions = "";
+    if(due.status==="stopped"){
+      actions += '<button class="btn primary" data-resume-due-detail="'+due.id+'">Resume</button>';
+    } else if(due.schedule==="flexible"){
+      actions += '<button class="btn primary" data-log-flex-detail="'+due.id+'">Log payment</button>';
+    } else if(fixedPhase(due).phase==="active" && st.kind!=="paid"){
+      actions += '<button class="btn primary" data-mark-paid-detail="'+due.id+'">Mark paid</button>';
+    }
+    actions += '<button class="btn ghost" data-edit-due-detail="'+due.id+'">Edit</button>';
+    if(due.status!=="stopped"){
+      actions += '<button class="btn ghost danger" data-stop-due-detail="'+due.id+'">Stop</button>';
+    }
+    document.getElementById("due-detail-actions").innerHTML = actions;
+    openDlg("dlg-due-detail");
+  }
+  document.getElementById("dlg-due-detail").addEventListener("click", function(e){
+    var payBtn = e.target.closest("[data-mark-paid-detail]");
+    var logBtn = e.target.closest("[data-log-flex-detail]");
+    var resumeBtn = e.target.closest("[data-resume-due-detail]");
+    var editBtn = e.target.closest("[data-edit-due-detail]");
+    var stopBtn = e.target.closest("[data-stop-due-detail]");
+    if(payBtn) logDuePaid(payBtn.dataset.markPaidDetail).then(function(){ openDueDetail(payBtn.dataset.markPaidDetail); });
+    if(logBtn){ document.getElementById("dlg-due-detail").close(); openLogPaymentDialog(logBtn.dataset.logFlexDetail); }
+    if(resumeBtn){ document.getElementById("dlg-due-detail").close(); openDueDialog(state.dues.find(function(d){return d.id===resumeBtn.dataset.resumeDueDetail;})); }
+    if(editBtn){ document.getElementById("dlg-due-detail").close(); openDueDialog(state.dues.find(function(d){return d.id===editBtn.dataset.editDueDetail;})); }
+    if(stopBtn) stopDue(stopBtn.dataset.stopDueDetail).then(function(){ openDueDetail(stopBtn.dataset.stopDueDetail); });
+  });
+
+  function wireRecurringList(id){
+    document.getElementById(id).addEventListener("click", function(e){
+      var editBtn = e.target.closest("[data-edit-due]");
+      var payBtn = e.target.closest("[data-mark-paid]");
+      var flexBtn = e.target.closest("[data-log-flex]");
+      var openBtn = e.target.closest("[data-open-due]");
+      var resumeBtn = e.target.closest("[data-resume-due]");
+      if(editBtn) openDueDialog(state.dues.find(function(d){return d.id===editBtn.dataset.editDue;}));
+      if(payBtn) logDuePaid(payBtn.dataset.markPaid);
+      if(flexBtn) openLogPaymentDialog(flexBtn.dataset.logFlex);
+      if(openBtn) openDueDetail(openBtn.dataset.openDue);
+      if(resumeBtn) openDueDialog(state.dues.find(function(d){return d.id===resumeBtn.dataset.resumeDue;}));
+    });
+  }
+  wireRecurringList("dues-list");
+  document.getElementById("ov-due-list").addEventListener("click", function(e){});
+
+  // ---------- EXPENSE form ----------
+  // Every remaining caller supplies a category — a category tab's own FAB
+  // or its list's edit action — so there's no picker here at all; the
+  // category rides along as a hidden field.
+  function openExpenseDialog(exp, category){
+    var f = document.getElementById("form-expense");
+    f.reset();
+    f.id.value = exp ? exp.id : "";
+    f.category.value = exp ? exp.category : category;
+    document.getElementById("expense-dlg-title").textContent = (exp ? "Edit — " : "Log — ") + f.category.value;
+    document.getElementById("expense-delete").style.display = exp ? "" : "none";
+    if(exp){ f.date.value = exp.date; f.amount.value = exp.amount; f.note.value = exp.note||""; }
+    else { f.date.value = todayISO(); }
+    openDlg("dlg-expense");
+    if(!exp) f.amount.focus();
+  }
+  document.getElementById("form-expense").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var category = f.category.value;
+    var note = f.note.value.trim();
+    var id = f.id.value;
+    var data = { date: f.date.value, amount: parseFloat(f.amount.value)||0, category: category, note: note };
+    (id ? updateItem("expense", id, data) : addItem("expense", data)).then(function(){ f.closest("dialog").close(); });
+  });
+  document.getElementById("expense-delete").addEventListener("click", function(){
+    var id = document.getElementById("form-expense").id.value;
+    if(id) deleteItem("expense", id).then(function(){ document.getElementById("dlg-expense").close(); });
+  });
+  // One delegated listener (on the whole document, since it also has to
+  // reach the report dialog's own filtered lists) covers every edit
+  // button — each carries its own category via data-cat, so editing stays
+  // locked to that category the same way adding one there does.
+  document.addEventListener("click", function(e){
+    var editBtn = e.target.closest("[data-edit-expense]");
+    if(editBtn) openExpenseDialog(state.expenses.find(function(x){return x.id===editBtn.dataset.editExpense;}), editBtn.dataset.cat);
+  });
+
+  // ---------- MISCELLANEOUS recurring-tag suggestions ----------
+  // Promoting a detected tag doesn't create a category tab — it opens the
+  // Recurring dialog pre-filled, so the thing becomes a real recurring due
+  // (with the one-tap/Stop/Resume machinery that implies). Once saved,
+  // pendingMiscPromotionKey tells the due form's submit handler which past
+  // Miscellaneous entries to relink to it.
+  var lastMiscCandidates = [];
+  var pendingMiscPromotionKey = null;
+  document.getElementById("misc-suggestions").addEventListener("click", function(e){
+    var promoteBtn = e.target.closest("[data-promote-misc]");
+    var dismissBtn = e.target.closest("[data-dismiss-misc]");
+    if(promoteBtn) promoteMiscTag(promoteBtn.dataset.promoteMisc);
+    if(dismissBtn) dismissMiscTag(dismissBtn.dataset.dismissMisc);
+  });
+  function promoteMiscTag(key){
+    var cand = lastMiscCandidates.find(function(c){ return c.key===key; });
+    if(!cand) return;
+    openDueDialog(null, { name: cand.label, category: cand.label, schedule: "flexible" });
+    pendingMiscPromotionKey = key;
+  }
+  async function dismissMiscTag(key){
+    var dismissed = (state.settings.dismissedMiscTags||[]).slice();
+    if(dismissed.indexOf(key)===-1) dismissed.push(key);
+    await saveSettings({ dismissedMiscTags: dismissed });
+  }
+
+  // ---------- INVESTMENT form ----------
+  function openInvestmentDialog(inv){
+    var f = document.getElementById("form-investment");
+    f.reset();
+    f.id.value = inv ? inv.id : "";
+    document.getElementById("investment-dlg-title").textContent = inv ? "Edit holding" : "Add a holding";
+    document.getElementById("investment-delete").style.display = inv ? "" : "none";
+    if(inv){ f.name.value = inv.name; f.type.value = inv.type; f.invested.value = inv.invested; f.currentValue.value = inv.currentValue; }
+    openDlg("dlg-investment");
+  }
+  document.getElementById("form-investment").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var data = { name: f.name.value.trim(), type: f.type.value, invested: parseFloat(f.invested.value)||0, currentValue: parseFloat(f.currentValue.value)||0 };
+    var id = f.id.value;
+    (id ? updateItem("investment", id, data) : addItem("investment", data)).then(function(){ f.closest("dialog").close(); });
+  });
+  document.getElementById("investment-delete").addEventListener("click", function(){
+    var id = document.getElementById("form-investment").id.value;
+    if(id) deleteItem("investment", id).then(function(){ document.getElementById("dlg-investment").close(); });
+  });
+  document.getElementById("investments-list").addEventListener("click", function(e){
+    var editBtn = e.target.closest("[data-edit-investment]");
+    if(editBtn) openInvestmentDialog(state.investments.find(function(x){return x.id===editBtn.dataset.editInvestment;}));
+  });
+
+  // ---------- GOAL form ----------
+  function openGoalDialog(goal){
+    var f = document.getElementById("form-goal");
+    f.reset();
+    f.id.value = goal ? goal.id : "";
+    document.getElementById("goal-dlg-title").textContent = goal ? "Edit goal" : "Add a savings goal";
+    document.getElementById("goal-delete").style.display = goal ? "" : "none";
+    if(goal){ f.name.value = goal.name; f.target.value = goal.target; f.current.value = goal.current; f.deadline.value = goal.deadline||""; }
+    else { f.current.value = 0; }
+    openDlg("dlg-goal");
+  }
+  document.getElementById("form-goal").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var data = { name: f.name.value.trim(), target: parseFloat(f.target.value)||0, current: parseFloat(f.current.value)||0, deadline: f.deadline.value||null };
+    var id = f.id.value;
+    (id ? updateItem("goal", id, data) : addItem("goal", data)).then(function(){ f.closest("dialog").close(); });
+  });
+  document.getElementById("goal-delete").addEventListener("click", function(){
+    var id = document.getElementById("form-goal").id.value;
+    if(id) deleteItem("goal", id).then(function(){ document.getElementById("dlg-goal").close(); });
+  });
+  document.getElementById("goals-list").addEventListener("click", function(e){
+    var editBtn = e.target.closest("[data-edit-goal]");
+    var contribBtn = e.target.closest("[data-contribute]");
+    if(editBtn) openGoalDialog(state.goals.find(function(x){return x.id===editBtn.dataset.editGoal;}));
+    if(contribBtn){
+      editingGoalId = contribBtn.dataset.contribute;
+      document.getElementById("form-contribute").id.value = editingGoalId;
+      document.getElementById("form-contribute").amount.value = "";
+      openDlg("dlg-contribute");
+    }
+  });
+  document.getElementById("form-contribute").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var goal = state.goals.find(function(g){ return g.id===f.id.value; });
+    if(goal){
+      var newCurrent = (Number(goal.current)||0) + (parseFloat(f.amount.value)||0);
+      updateItem("goal", goal.id, {current:newCurrent}).then(function(){ f.closest("dialog").close(); });
+    }
+  });
+
+  // ---------- REPORTS (weekly / monthly / yearly breakdown) ----------
+  var reportState = { period:null, month:null, week:1, year:null };
+  var lastReportBuckets = [];
+  var downloadsNamespace = null;
+  (async function(){
+    try{ downloadsNamespace = window.claude ? await window.claude.use("downloads") : null; }
+    catch(e){ downloadsNamespace = null; }
+  })();
+
+  document.querySelectorAll("[data-report-period]").forEach(function(b){
+    b.addEventListener("click", function(){ openReport(b.dataset.reportPeriod); });
+  });
+  function openReport(period){
+    reportState = { period: period, month: monthKey(new Date()), week: 1, year: String(new Date().getFullYear()) };
+    document.getElementById("report-title").textContent =
+      period==="week" ? "Weekly report" : period==="month" ? "Monthly report" : "Yearly report";
+    document.getElementById("report-month-field").hidden = period==="year";
+    document.getElementById("report-week-field").hidden = period!=="week";
+    document.getElementById("report-year-field").hidden = period!=="year";
+    document.getElementById("report-month").value = reportState.month;
+    document.getElementById("report-year").value = reportState.year;
+    populateReportWeeks();
+    document.getElementById("report-picker").hidden = false;
+    document.getElementById("report-breakdown").hidden = true;
+    openDlg("dlg-report");
+  }
+  function populateReportWeeks(){
+    var p = reportState.month.split("-");
+    var daysInMonth = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
+    var weeks = Math.ceil(daysInMonth/7);
+    var sel = document.getElementById("report-week");
+    var opts = [];
+    for(var i=1;i<=weeks;i++){
+      var start=(i-1)*7+1, end=Math.min(start+6, daysInMonth);
+      opts.push('<option value="'+i+'">Week '+i+' ('+start+'–'+end+')</option>');
+    }
+    sel.innerHTML = opts.join("");
+    sel.value = reportState.week;
+  }
+  document.getElementById("report-month").addEventListener("change", function(){
+    reportState.month = this.value; populateReportWeeks();
+  });
+  document.getElementById("report-week").addEventListener("change", function(){ reportState.week = parseInt(this.value,10)||1; });
+  document.getElementById("report-year").addEventListener("change", function(){ reportState.year = this.value; });
+  document.getElementById("report-show").addEventListener("click", function(){
+    document.getElementById("report-picker").hidden = true;
+    document.getElementById("report-breakdown").hidden = false;
+    document.getElementById("report-pie").hidden = true;
+    document.getElementById("report-detail-panel").hidden = true;
+    renderReportBreakdown();
+  });
+  document.getElementById("report-change-period").addEventListener("click", function(){
+    document.getElementById("report-picker").hidden = false;
+    document.getElementById("report-breakdown").hidden = true;
+  });
+  document.getElementById("report-toggle-pie").addEventListener("click", function(){
+    var el = document.getElementById("report-pie");
+    el.hidden = !el.hidden;
+    if(!el.hidden) renderReportPie(lastReportBuckets);
+  });
+
+  function reportMatchedExpenses(){
+    return state.expenses.filter(function(e){
+      var d = e.date; if(!d) return false;
+      if(reportState.period==="year") return d.slice(0,4)===reportState.year;
+      if(reportState.period==="month") return d.slice(0,7)===reportState.month;
+      if(reportState.period==="week"){
+        if(d.slice(0,7)!==reportState.month) return false;
+        var day = parseInt(d.slice(8,10),10);
+        var start=(reportState.week-1)*7+1, end=start+6;
+        return day>=start && day<=end;
+      }
+      return false;
+    });
+  }
+  function reportPeriodLabel(){
+    if(reportState.period==="year") return reportState.year;
+    if(reportState.period==="month") return fmtMonth(reportState.month);
+    if(reportState.period==="week") return "Week "+reportState.week+" · "+fmtMonth(reportState.month);
+    return "";
+  }
+  // First split: recurring vs. everything else, as one "Recurring" bucket;
+  // second split: each remaining category gets its own bucket. Matches the
+  // "recurring, groceries, and all other categories" selection model.
+  function reportBuckets(list){
+    var buckets = [];
+    var rec = list.filter(function(e){ return e.recurring; });
+    if(rec.length){
+      buckets.push({ key:"recurring", label:"Recurring", total: rec.reduce(function(s,e){return s+(Number(e.amount)||0);},0), count: rec.length });
+    }
+    var nonRec = list.filter(function(e){ return !e.recurring; });
+    categoryTotals(nonRec).forEach(function(c){
+      buckets.push({ key:"cat:"+c.category, label:c.category, total:c.total,
+        count: nonRec.filter(function(e){return e.category===c.category;}).length });
+    });
+    return buckets;
+  }
+  function renderReportBreakdown(){
+    var list = reportMatchedExpenses();
+    var total = list.reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
+    document.getElementById("report-period-label").textContent = reportPeriodLabel();
+    document.getElementById("report-total").textContent = fmt(total);
+    var buckets = reportBuckets(list);
+    lastReportBuckets = buckets;
+    document.getElementById("report-buckets").innerHTML = buckets.length ? buckets.map(function(b){
+      return '<div class="row" style="cursor:pointer;" data-bucket="'+esc(b.key)+'">' +
+        '<div class="main"><div class="name">'+esc(b.label)+'</div><div class="tag">'+b.count+(b.count===1?' entry':' entries')+'</div></div>' +
+        '<span class="amt neg num">-'+fmt(b.total)+'</span></div>';
+    }).join("") : '<div class="empty">Nothing logged in this period.</div>';
+    if(!document.getElementById("report-pie").hidden) renderReportPie(buckets);
+    document.getElementById("report-detail-panel").hidden = true;
+    renderReportCalendar(list);
+  }
+
+  // ---------- calendar view: tap a date to see that day's expenses ----------
+  function dayTotalsMap(list){
+    var map = {};
+    list.forEach(function(e){ map[e.date] = (map[e.date]||0) + (Number(e.amount)||0); });
+    return map;
+  }
+  function calDowRow(){
+    return ["Su","Mo","Tu","We","Th","Fr","Sa"].map(function(x){ return '<div class="cal-dow">'+x+'</div>'; }).join("");
+  }
+  function buildMonthCalendarHtml(ym, dayTotals, monthLabel){
+    var p = ym.split("-");
+    var year = parseInt(p[0],10), month = parseInt(p[1],10)-1;
+    var firstDow = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    var cells = [];
+    for(var i=0;i<firstDow;i++) cells.push('<div class="cal-day empty"></div>');
+    for(var d=1; d<=daysInMonth; d++){
+      var dateStr = ym + "-" + String(d).padStart(2,"0");
+      var amt = dayTotals[dateStr];
+      cells.push('<div class="cal-day'+(amt?' has-spend':'')+'" data-cal-date="'+dateStr+'">' +
+        '<span class="cal-daynum">'+d+'</span>' + (amt ? '<span class="cal-amt">'+fmt(amt)+'</span>' : '') +
+        '</div>');
+    }
+    return (monthLabel ? '<div class="cal-month-label">'+esc(monthLabel)+'</div>' : '') +
+      '<div class="cal-grid">' + calDowRow() + cells.join("") + '</div>';
+  }
+  function buildWeekCalendarHtml(ym, week, dayTotals){
+    var p = ym.split("-");
+    var year = parseInt(p[0],10), month = parseInt(p[1],10)-1;
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    var start = (week-1)*7+1, end = Math.min(start+6, daysInMonth);
+    var cells = [];
+    for(var d=start; d<=end; d++){
+      var dateStr = ym+"-"+String(d).padStart(2,"0");
+      var amt = dayTotals[dateStr];
+      var dow = new Date(year,month,d).toLocaleDateString(undefined,{weekday:"short"});
+      cells.push('<div class="cal-day'+(amt?' has-spend':'')+'" data-cal-date="'+dateStr+'" style="aspect-ratio:auto; padding:10px 4px;">' +
+        '<span class="cal-dow" style="padding:0;">'+dow+'</span><span class="cal-daynum">'+d+'</span>' + (amt?'<span class="cal-amt">'+fmt(amt)+'</span>':'') +
+        '</div>');
+    }
+    return '<div class="cal-grid" style="grid-template-columns:repeat('+cells.length+',1fr);">'+cells.join("")+'</div>';
+  }
+  function buildYearCalendarHtml(year, dayTotals){
+    var html = "";
+    for(var m=1;m<=12;m++){
+      var ym = year+"-"+String(m).padStart(2,"0");
+      var label = new Date(parseInt(year,10), m-1, 1).toLocaleDateString(undefined,{month:"long"});
+      html += buildMonthCalendarHtml(ym, dayTotals, label);
+    }
+    return html;
+  }
+  function renderReportCalendar(list){
+    var dayTotals = dayTotalsMap(list);
+    var el = document.getElementById("report-calendar");
+    if(reportState.period==="month") el.innerHTML = buildMonthCalendarHtml(reportState.month, dayTotals, null);
+    else if(reportState.period==="week") el.innerHTML = buildWeekCalendarHtml(reportState.month, reportState.week, dayTotals);
+    else if(reportState.period==="year") el.innerHTML = buildYearCalendarHtml(reportState.year, dayTotals);
+  }
+  document.getElementById("report-calendar").addEventListener("click", function(e){
+    var cell = e.target.closest("[data-cal-date]");
+    if(cell) renderReportDayDetail(cell.dataset.calDate);
+  });
+  function renderReportDayDetail(dateStr){
+    var items = state.expenses.filter(function(e){ return e.date===dateStr; })
+      .sort(function(a,b){ return (a.category||"").localeCompare(b.category||""); });
+    var panel = document.getElementById("report-detail-panel");
+    var titleEl = document.getElementById("report-detail-title");
+    var listEl = document.getElementById("report-detail-list");
+    panel.hidden = false;
+    var d = new Date(dateStr+"T00:00:00");
+    titleEl.textContent = d.toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long", year:"numeric"});
+    listEl.innerHTML = items.length ? items.map(function(e){
+      return '<div class="row"><div class="main"><div class="name">'+esc(e.note||e.category)+'</div><div class="tag">'+esc(e.category)+(e.recurring?' · recurring':'')+'</div></div>' +
+        '<span class="amt neg num">-'+fmt(e.amount)+'</span>' +
+        '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(e.category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
+    }).join("") : '<div class="empty">Nothing logged this day.</div>';
+    panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+  document.getElementById("report-buckets").addEventListener("click", function(e){
+    var row = e.target.closest("[data-bucket]");
+    if(row) renderReportDetail(row.dataset.bucket);
+  });
+  function renderReportDetail(bucketKey){
+    var list = reportMatchedExpenses();
+    var panel = document.getElementById("report-detail-panel");
+    var titleEl = document.getElementById("report-detail-title");
+    var listEl = document.getElementById("report-detail-list");
+    panel.hidden = false;
+    if(bucketKey === "recurring"){
+      titleEl.textContent = "Recurring payments";
+      var byDue = {};
+      list.filter(function(e){ return e.recurring; }).forEach(function(e){
+        var key = e.dueId || e.category;
+        if(!byDue[key]){
+          var due = state.dues.find(function(d){ return d.id===e.dueId; });
+          byDue[key] = { dueId: e.dueId, name: due ? due.name : (e.note||e.category), total:0, count:0, dates:[] };
+        }
+        byDue[key].total += Number(e.amount)||0;
+        byDue[key].count += 1;
+        byDue[key].dates.push(e.date);
+      });
+      var rows = Object.keys(byDue).map(function(k){ return byDue[k]; }).sort(function(a,b){ return b.total-a.total; });
+      listEl.innerHTML = rows.length ? rows.map(function(r){
+        var dateList = r.dates.slice().sort().map(function(d){ return fmtShortDate(d); }).join(", ");
+        return '<div class="row"><div class="main"><div class="name">'+esc(r.name)+'</div><div class="tag">'+r.count+(r.count===1?' payment':' payments')+' · '+dateList+'</div></div>' +
+          '<span class="amt neg num">-'+fmt(r.total)+'</span>' +
+          '<div class="actions">'+(r.dueId ? '<button class="btn small ghost" data-report-open-due="'+r.dueId+'">History</button>' : '')+'</div></div>';
+      }).join("") : '<div class="empty">No recurring payments in this period.</div>';
+    } else {
+      var cat = bucketKey.replace(/^cat:/,"");
+      titleEl.textContent = cat;
+      var items = list.filter(function(e){ return !e.recurring && e.category===cat; })
+        .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+      listEl.innerHTML = items.length ? categoryRowsHtml(cat, items) : '<div class="empty">Nothing logged.</div>';
+    }
+  }
+  document.getElementById("report-detail-list").addEventListener("click", function(e){
+    var openBtn = e.target.closest("[data-report-open-due]");
+    if(openBtn) openDueDetail(openBtn.dataset.reportOpenDue);
+  });
+
+  function renderReportPie(buckets){
+    var el = document.getElementById("report-pie");
+    var total = buckets.reduce(function(s,b){ return s+b.total; },0);
+    if(total<=0){ el.innerHTML = '<div class="empty">Nothing to chart.</div>'; return; }
+    var acc = 0;
+    var stops = buckets.map(function(b,i){
+      var pct = b.total/total*100;
+      var start = acc; acc += pct;
+      return 'var(--chart-'+((i%6)+1)+') '+start.toFixed(3)+'% '+acc.toFixed(3)+'%';
+    }).join(", ");
+    var legend = buckets.map(function(b,i){
+      return '<div class="legend-row"><span class="swatch" style="background:var(--chart-'+((i%6)+1)+');"></span>' +
+        '<span style="flex:1;">'+esc(b.label)+'</span><span class="num">'+fmt(b.total)+'</span></div>';
+    }).join("");
+    el.innerHTML = '<div class="pie-wrap"><div class="pie" style="background:conic-gradient('+stops+');"></div><div class="pie-legend">'+legend+'</div></div>';
+  }
+
+  function csvField(v){
+    v = String(v==null ? "" : v);
+    return /[",\r\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  }
+  function buildReportCsv(){
+    var list = reportMatchedExpenses().slice().sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+    var lines = ["Transactions", "Date,Category,Type,Amount,Note"];
+    list.forEach(function(e){
+      lines.push([e.date, csvField(e.category), e.recurring?"Recurring":"Other", (Number(e.amount)||0).toFixed(2), csvField(e.note||"")].join(","));
+    });
+    lines.push("", "By category", "Category,Total");
+    categoryTotals(list).forEach(function(c){ lines.push(csvField(c.category)+","+c.total.toFixed(2)); });
+    var rec = list.filter(function(e){return e.recurring;}).reduce(function(s,e){return s+(Number(e.amount)||0);},0);
+    var non = list.filter(function(e){return !e.recurring;}).reduce(function(s,e){return s+(Number(e.amount)||0);},0);
+    lines.push("", "By type", "Type,Total", "Recurring,"+rec.toFixed(2), "Other,"+non.toFixed(2));
+    return lines.join("\r\n");
+  }
+  document.getElementById("report-export").addEventListener("click", async function(){
+    if(!downloadsNamespace) return;
+    var csv = buildReportCsv();
+    var filename = "expenses-" + reportPeriodLabel().replace(/[^a-z0-9]+/gi,"-").toLowerCase() + ".csv";
+    try{ await downloadsNamespace.save({ filename: filename, data: csv }); }catch(e){}
+  });
+
+  // ---------- BACKUP (a whole year) & FLUSH ----------
+  // Unlike the Reports export (one period's expenses), this is a full
+  // snapshot: every expense that year plus its summaries, and the CURRENT
+  // state of recurring payments, investments, goals, and incentives —
+  // those aren't year-scoped data, so they're included as a snapshot,
+  // clearly labeled as such rather than pretending they belong to the year.
+  function buildYearBackupCsv(year){
+    var expenses = state.expenses.filter(function(e){ return (e.date||"").slice(0,4)===year; })
+      .sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+    var lines = ["FINANCER BACKUP — " + year, ""];
+    lines.push("Expenses", "Date,Category,Type,Amount,Note");
+    expenses.forEach(function(e){
+      lines.push([e.date, csvField(e.category), e.recurring?"Recurring":"Other", (Number(e.amount)||0).toFixed(2), csvField(e.note||"")].join(","));
+    });
+    lines.push("", "By category", "Category,Total");
+    categoryTotals(expenses).forEach(function(c){ lines.push(csvField(c.category)+","+c.total.toFixed(2)); });
+    var rec = expenses.filter(function(e){return e.recurring;}).reduce(function(s,e){return s+(Number(e.amount)||0);},0);
+    var non = expenses.filter(function(e){return !e.recurring;}).reduce(function(s,e){return s+(Number(e.amount)||0);},0);
+    lines.push("", "By type", "Type,Total", "Recurring,"+rec.toFixed(2), "Other,"+non.toFixed(2));
+
+    lines.push("", "Incentives logged in " + year, "Date,Amount,Note");
+    state.incomes.filter(function(i){ return (i.date||"").slice(0,4)===year; }).forEach(function(i){
+      lines.push([i.date, (Number(i.amount)||0).toFixed(2), csvField(i.note||"")].join(","));
+    });
+
+    lines.push("", "Recurring payments (current snapshot, not year-scoped)", "Name,Category,Schedule,Status,Amount,Due day,Autopay,Cadence");
+    state.dues.forEach(function(d){
+      var st = recurringStatus(d);
+      lines.push([csvField(d.name), csvField(d.category), d.schedule, st.kind,
+        d.schedule==="flexible" ? "" : (Number(d.amount)||0).toFixed(2),
+        d.schedule==="flexible" ? "" : (d.dueDay||""),
+        d.schedule==="flexible" ? "" : (d.autopay?"yes":"no"),
+        d.schedule==="flexible" ? (d.cadence||"") : ""
+      ].join(","));
+    });
+
+    lines.push("", "Investments (current snapshot, not year-scoped)", "Name,Type,Invested,Current value");
+    state.investments.forEach(function(i){
+      lines.push([csvField(i.name), csvField(i.type), (Number(i.invested)||0).toFixed(2), (Number(i.currentValue)||0).toFixed(2)].join(","));
+    });
+
+    lines.push("", "Savings goals (current snapshot, not year-scoped)", "Name,Target,Current,Deadline");
+    state.goals.forEach(function(g){
+      lines.push([csvField(g.name), (Number(g.target)||0).toFixed(2), (Number(g.current)||0).toFixed(2), csvField(g.deadline||"")].join(","));
+    });
+
+    return lines.join("\r\n");
+  }
+  document.getElementById("btn-export-year").addEventListener("click", async function(){
+    if(!downloadsNamespace) return;
+    var year = document.getElementById("backup-year").value || String(new Date().getFullYear());
+    var csv = buildYearBackupCsv(year);
+    try{ await downloadsNamespace.save({ filename: "financer-backup-"+year+".csv", data: csv }); }catch(e){}
+  });
+  document.getElementById("btn-flush-data").addEventListener("click", function(){ openDlg("dlg-flush-confirm"); });
+  document.getElementById("btn-flush-confirm-yes").addEventListener("click", function(){
+    state.dues = []; state.expenses = []; state.investments = []; state.goals = []; state.incomes = [];
+    state.settings = { currency: "€", monthlyIncome: 0 };
+    saveLocal();
+    document.getElementById("dlg-flush-confirm").close();
+    document.getElementById("dlg-settings").close();
+    renderAll();
+  });
+
+  // ---------- SETTINGS form ----------
+  document.getElementById("form-settings").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0 })
+      .then(function(){ f.closest("dialog").close(); });
+  });
+
+  // ---------- INCENTIVES (view/delete only — adding happens via the FAB) ----------
+  document.getElementById("settings-incentives-list").addEventListener("click", function(e){
+    var delBtn = e.target.closest("[data-delete-incentive]");
+    if(delBtn) deleteItem("income", delBtn.dataset.deleteIncentive);
+  });
+
+  // ---------- OVERVIEW QUICK LOG (an incentive, or a payment against any
+  // ongoing recurring due — one form either way) ----------
+  function openQuickOverviewDialog(){
+    var f = document.getElementById("form-quick-overview");
+    f.reset();
+    f.date.value = todayISO();
+    var sel = document.getElementById("quick-overview-target");
+    var activeDues = state.dues.filter(function(d){ return d.status!=="stopped"; })
+      .slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+    var html = '<option value="incentive">Incentive (extra income)</option>';
+    if(activeDues.length){
+      html += '<optgroup label="Recurring payments">' +
+        activeDues.map(function(d){ return '<option value="due:'+d.id+'">'+esc(d.name)+'</option>'; }).join("") +
+        '</optgroup>';
+    }
+    sel.innerHTML = html;
+    openDlg("dlg-quick-overview");
+  }
+  document.getElementById("form-quick-overview").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    var target = f.target.value;
+    var amount = parseFloat(f.amount.value)||0;
+    var date = f.date.value;
+    var note = f.note.value.trim();
+    var task = target==="incentive"
+      ? addItem("income", { date: date, amount: amount, note: note })
+      : logQuickPayment(target.slice(4), amount, date, note);
+    task.then(function(){ f.closest("dialog").close(); });
+  });
+  // A payment logged this way works for either schedule: it drops the
+  // expense (linked via dueId, same as Mark Paid / Log Payment) and moves
+  // lastPaid/paidMonth/paidTotal the same way those do, just without
+  // leaving Overview first.
+  async function logQuickPayment(dueId, amount, date, note){
+    var due = state.dues.find(function(d){ return d.id===dueId; });
+    if(!due) return;
+    await addItem("expense", {
+      date: date, amount: amount, category: due.category,
+      note: due.name + (note ? " — " + note : ""), recurring: true, dueId: dueId
+    });
+    var patch = { lastPaid: date };
+    if(due.schedule !== "flexible"){ patch.paidMonth = monthKey(new Date(date+"T00:00:00")); }
+    if(due.trackBalance){ patch.paidTotal = (Number(due.paidTotal)||0) + amount; }
+    await updateItem("due", dueId, patch);
+  }
+
+  renderAll();
+  initStore();
+})();
+</script>
+
+</body>
+</html>
