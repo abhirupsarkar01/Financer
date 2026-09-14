@@ -1638,16 +1638,36 @@
         f.trackBalance.checked = !!due.trackBalance;
         f.originalAmount.value = due.originalAmount||"";
       } else {
-        f.amount.value = due.amount; f.dueDay.value = due.dueDay;
-        f.startMonth.value = due.startMonth||""; f.termMonths.value = due.termMonths||"";
+        f.amount.value = due.amount;
+        f.startMonth.value = due.startMonth||"";
+        updateDueDayOptions(f, due.dueDay);
+        f.termMonths.value = due.termMonths||"";
         f.autopay.checked = !!due.autopay;
       }
     } else {
       f.startMonth.value = monthKey(new Date());
+      updateDueDayOptions(f);
       if(prefill) f.name.value = prefill.name;
     }
     openDlg("dlg-due");
   }
+  // The day list matches whatever month "Starts" is set to (28-31 days,
+  // leap Februaries included) — a due day only needs to exist in the
+  // month the schedule actually starts from; later months capping a
+  // 31st down to their own last day is already handled at run time.
+  function updateDueDayOptions(f, keepValue){
+    var ym = (f.startMonth.value || monthKey(new Date())).split("-");
+    var y = parseInt(ym[0],10), m = parseInt(ym[1],10)-1;
+    var nd = daysInMonthOf(y, m);
+    var cur = keepValue!=null ? keepValue : (parseInt(f.dueDay.value,10)||1);
+    if(cur>nd) cur = nd;
+    var html = "";
+    for(var d=1; d<=nd; d++){ html += '<option value="'+d+'"'+(d===cur?" selected":"")+'>'+d+'</option>'; }
+    f.dueDay.innerHTML = html;
+  }
+  document.getElementById("form-due").startMonth.addEventListener("change", function(){
+    updateDueDayOptions(document.getElementById("form-due"));
+  });
   document.getElementById("form-due").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
@@ -2459,8 +2479,6 @@
   }
 
   buildDateSelects();
-  document.getElementById("due-day-select").innerHTML =
-    Array.from({length:31}, function(_,i){ return '<option value="'+(i+1)+'">'+(i+1)+'</option>'; }).join("");
   renderAll();
   initStore();
 })();
