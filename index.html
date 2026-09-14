@@ -776,8 +776,30 @@
   </div>
 </dialog>
 
+<!-- OVERVIEW ADD: the + button's chooser while on Overview — every kind of
+     entry is one tap away here, not just an incentive/recurring log. -->
+<dialog id="dlg-overview-add">
+  <div class="sheet">
+    <div class="sheet-head"><h3>Add</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-body">
+      <div class="field" style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" class="btn primary" id="qa-incentive" style="width:100%;">Add incentive</button>
+        <button type="button" class="btn" id="qa-logdue" style="width:100%;">Log a recurring payment</button>
+        <button type="button" class="btn" id="qa-newdue" style="width:100%;">Add a recurring payment</button>
+        <button type="button" class="btn" id="qa-investment" style="width:100%;">Add an investment</button>
+        <button type="button" class="btn" id="qa-goal" style="width:100%;">Add a savings goal</button>
+      </div>
+      <div class="field">
+        <label>Add an expense in…</label>
+        <div class="two-col" id="qa-categories" style="gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 <!-- OVERVIEW QUICK LOG: an incentive, or a payment against any ongoing
-     recurring due — reached from the + button while on Overview -->
+     recurring due — reached from the "Add incentive" / "Log a recurring
+     payment" buttons above -->
 <dialog id="dlg-quick-overview">
   <form class="sheet" id="form-quick-overview">
     <div class="sheet-head"><h3>Quick log</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
@@ -1251,14 +1273,21 @@
     var incentivesThisMonth = state.incomes.filter(function(i){ return (i.date||"").slice(0,7)===monthKey(new Date()); })
       .reduce(function(s,i){ return s+(Number(i.amount)||0); },0);
     var incomeTotal = mi + incentivesThisMonth;
-    var duesThisMonthTotal = fixedActive.reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+    // A due only counts against "available" once it's actually due (today
+    // or overdue) or already paid this month — setting one up, or simply
+    // having it scheduled for later this month, shouldn't shrink the
+    // available balance before the money has actually left.
+    var duesThisMonthTotal = fixedActive.filter(function(d){
+      var st = recurringStatus(d);
+      return st.kind==="paid" || st.kind==="overdue" || ((st.kind==="soon"||st.kind==="upcoming") && st.sortKey<=0);
+    }).reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
 
     var available = incomeTotal - spent - duesThisMonthTotal;
     var availEl = document.getElementById("ov-available");
     availEl.textContent = fmt(available);
     availEl.className = "value num" + (available < 0 ? " negative" : "");
     document.getElementById("ov-available-sub").textContent =
-      fmt(incomeTotal) + " income − " + fmt(spent + duesThisMonthTotal) + " spent & due";
+      fmt(incomeTotal) + " income − " + fmt(spent + duesThisMonthTotal) + " spent & due so far";
 
     if(incomeTotal > 0){
       var rate = ((incomeTotal - spent - duesThisMonthTotal) / incomeTotal) * 100;
@@ -1448,11 +1477,48 @@
   // a category tab it's the same expense dialog everyone else uses, just
   // with that category preselected.
   document.getElementById("fab").addEventListener("click", function(){
-    if(activeTab==="overview") openQuickOverviewDialog();
+    if(activeTab==="overview") openOverviewAddDialog();
     else if(activeTab==="dues") openDueDialog(null);
     else if(activeTab==="investments") openInvestmentDialog(null);
     else if(activeTab==="savings") openGoalDialog(null);
     else if(CATEGORY_TABS[activeTab]) openExpenseDialog(null, CATEGORY_TABS[activeTab]);
+  });
+
+  // ---------- OVERVIEW ADD (the + button's chooser on Overview) ----------
+  function openOverviewAddDialog(){
+    var wrap = document.getElementById("qa-categories");
+    wrap.innerHTML = Object.keys(CATEGORY_TABS).map(function(slug){
+      return '<button type="button" class="btn ghost small" data-qa-category="'+slug+'" style="width:100%;">'+esc(CATEGORY_TABS[slug])+'</button>';
+    }).join("");
+    openDlg("dlg-overview-add");
+  }
+  document.getElementById("qa-incentive").addEventListener("click", function(){
+    document.getElementById("dlg-overview-add").close();
+    openQuickOverviewDialog();
+  });
+  document.getElementById("qa-logdue").addEventListener("click", function(){
+    document.getElementById("dlg-overview-add").close();
+    openQuickOverviewDialog();
+    var sel = document.getElementById("quick-overview-target");
+    if(sel.options.length>1) sel.selectedIndex = 1;
+  });
+  document.getElementById("qa-newdue").addEventListener("click", function(){
+    document.getElementById("dlg-overview-add").close();
+    openDueDialog(null);
+  });
+  document.getElementById("qa-investment").addEventListener("click", function(){
+    document.getElementById("dlg-overview-add").close();
+    openInvestmentDialog(null);
+  });
+  document.getElementById("qa-goal").addEventListener("click", function(){
+    document.getElementById("dlg-overview-add").close();
+    openGoalDialog(null);
+  });
+  document.getElementById("qa-categories").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-qa-category]");
+    if(!btn) return;
+    document.getElementById("dlg-overview-add").close();
+    openExpenseDialog(null, CATEGORY_TABS[btn.dataset.qaCategory]);
   });
 
   document.getElementById("btn-settings").addEventListener("click", function(){ openDlg("dlg-settings"); });
