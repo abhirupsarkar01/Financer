@@ -302,6 +302,8 @@
   .field.check input{ width:auto; }
   .field.check label{ text-transform:none; letter-spacing:0; font-size:0.9rem; color:var(--ink); }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .date-select{ display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:6px; }
+  .date-select select:disabled{ opacity:0.45; }
   .sheet-foot{ padding:16px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
 
   .sync-note{ font-size:0.78rem; color:var(--ink-soft); line-height:1.5; }
@@ -549,7 +551,10 @@
       <input type="hidden" name="id">
       <div class="two-col">
         <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
-        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+        <div class="field"><label>Date</label>
+          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+          <input type="hidden" name="date">
+        </div>
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
@@ -580,7 +585,10 @@
       <input type="hidden" name="id">
       <input type="hidden" name="category">
       <div class="two-col">
-        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+        <div class="field"><label>Date</label>
+          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+          <input type="hidden" name="date">
+        </div>
         <div class="field"><label id="expense-amount-label">Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
@@ -630,7 +638,10 @@
         <div class="field"><label>Target</label><input name="target" type="number" step="0.01" min="0" required></div>
         <div class="field"><label>Current</label><input name="current" type="number" step="0.01" min="0" required></div>
       </div>
-      <div class="field"><label>Target date</label><input name="deadline" type="date"></div>
+      <div class="field"><label>Target date</label>
+        <div class="date-select" data-date-target="deadline" data-optional="1"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+        <input type="hidden" name="deadline">
+      </div>
     </div>
     <div class="sheet-foot">
       <button type="button" class="btn danger" id="goal-delete" style="display:none;margin-right:auto;">Delete</button>
@@ -809,7 +820,10 @@
       </div>
       <div class="two-col">
         <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
-        <div class="field"><label>Date</label><input name="date" type="date" required></div>
+        <div class="field"><label>Date</label>
+          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+          <input type="hidden" name="date">
+        </div>
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
@@ -1022,6 +1036,62 @@
   function svgTrash(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>'; }
   function svgEdit(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>'; }
   function esc(s){ var d=document.createElement("div"); d.textContent = s==null?"":s; return d.innerHTML; }
+
+  // ---------- DATE SELECT (day/month/year dropdowns instead of a native
+  // date picker — a hidden input alongside each triple keeps holding the
+  // plain ISO string, so every existing f.date.value read/write elsewhere
+  // in the app keeps working unchanged). ----------
+  var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  function daysInMonthOf(y,m){ return new Date(y, m+1, 0).getDate(); }
+  function buildDateSelects(){
+    document.querySelectorAll(".date-select").forEach(function(wrap){
+      var optional = wrap.dataset.optional === "1";
+      var monthSel = wrap.querySelector(".ds-month"), daySel = wrap.querySelector(".ds-day"), yearSel = wrap.querySelector(".ds-year");
+      monthSel.innerHTML = (optional ? '<option value="">—</option>' : "") +
+        MONTH_NAMES.map(function(nm,i){ return '<option value="'+i+'">'+nm+'</option>'; }).join("");
+      var curY = new Date().getFullYear(), yearOpts = "";
+      for(var y=curY-6; y<=curY+3; y++){ yearOpts += '<option value="'+y+'">'+y+'</option>'; }
+      yearSel.innerHTML = yearOpts;
+      function commit(keepDay){
+        var form = wrap.closest("form");
+        var hidden = form.elements[wrap.dataset.dateTarget];
+        if(monthSel.value===""){
+          hidden.value = "";
+          daySel.innerHTML = '<option value="">—</option>';
+          daySel.disabled = true; yearSel.disabled = true;
+          return;
+        }
+        daySel.disabled = false; yearSel.disabled = false;
+        var yy = parseInt(yearSel.value,10), mm = parseInt(monthSel.value,10);
+        var nd = daysInMonthOf(yy,mm);
+        var curD = keepDay!=null ? keepDay : (parseInt(daySel.value,10)||1);
+        if(curD>nd) curD = nd;
+        var html = "";
+        for(var d=1; d<=nd; d++){ html += '<option value="'+d+'"'+(d===curD?" selected":"")+'>'+d+'</option>'; }
+        daySel.innerHTML = html;
+        hidden.value = yy+"-"+String(mm+1).padStart(2,"0")+"-"+String(curD).padStart(2,"0");
+      }
+      monthSel.addEventListener("change", function(){ commit(); });
+      yearSel.addEventListener("change", function(){ commit(); });
+      daySel.addEventListener("change", function(){ commit(parseInt(daySel.value,10)); });
+      wrap._dateCommit = commit;
+    });
+  }
+  function setDateSelectValue(form, name, iso){
+    var wrap = form.querySelector('.date-select[data-date-target="'+name+'"]');
+    if(!wrap) return;
+    var monthSel = wrap.querySelector(".ds-month"), yearSel = wrap.querySelector(".ds-year");
+    if(!iso){ monthSel.value = ""; wrap._dateCommit(); return; }
+    var p = iso.split("-");
+    var y = parseInt(p[0],10), m = parseInt(p[1],10)-1, d = parseInt(p[2],10);
+    if(!yearSel.querySelector('option[value="'+y+'"]')){
+      var opt = document.createElement("option"); opt.value = String(y); opt.textContent = String(y);
+      yearSel.appendChild(opt);
+    }
+    yearSel.value = String(y);
+    monthSel.value = String(m);
+    wrap._dateCommit(d);
+  }
 
   // Logging a fixed due as paid also drops a matching expense entry for the
   // same month, dated today, so it shows up in the spend total and category
@@ -1627,7 +1697,7 @@
     var f = document.getElementById("form-logpayment");
     f.reset();
     f.id.value = dueId;
-    f.date.value = todayISO();
+    setDateSelectValue(f, "date", todayISO());
     document.getElementById("logpayment-title").textContent = "Log a payment — " + due.name;
     openDlg("dlg-logpayment");
   }
@@ -1727,10 +1797,10 @@
       currency==="EUR" ? "Amount" : "Amount (" + curInfo.symbol + " " + currency + ")";
     document.getElementById("expense-delete").style.display = exp ? "" : "none";
     if(exp){
-      f.date.value = exp.date;
+      setDateSelectValue(f, "date", exp.date);
       f.amount.value = (exp.originalAmount!=null ? exp.originalAmount : exp.amount);
       f.note.value = exp.note||"";
-    } else { f.date.value = todayISO(); }
+    } else { setDateSelectValue(f, "date", todayISO()); }
     openDlg("dlg-expense");
     if(!exp) f.amount.focus();
   }
@@ -1886,8 +1956,8 @@
     f.id.value = goal ? goal.id : "";
     document.getElementById("goal-dlg-title").textContent = goal ? "Edit goal" : "Add a savings goal";
     document.getElementById("goal-delete").style.display = goal ? "" : "none";
-    if(goal){ f.name.value = goal.name; f.target.value = goal.target; f.current.value = goal.current; f.deadline.value = goal.deadline||""; }
-    else { f.current.value = 0; }
+    if(goal){ f.name.value = goal.name; f.target.value = goal.target; f.current.value = goal.current; setDateSelectValue(f, "deadline", goal.deadline||""); }
+    else { f.current.value = 0; setDateSelectValue(f, "deadline", ""); }
     openDlg("dlg-goal");
   }
   document.getElementById("form-goal").addEventListener("submit", function(e){
@@ -2346,7 +2416,7 @@
   function openQuickOverviewDialog(){
     var f = document.getElementById("form-quick-overview");
     f.reset();
-    f.date.value = todayISO();
+    setDateSelectValue(f, "date", todayISO());
     var sel = document.getElementById("quick-overview-target");
     var activeDues = state.dues.filter(function(d){ return d.status!=="stopped"; })
       .slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
@@ -2388,6 +2458,7 @@
     await updateItem("due", dueId, patch);
   }
 
+  buildDateSelects();
   renderAll();
   initStore();
 })();
