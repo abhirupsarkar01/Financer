@@ -972,7 +972,7 @@
   function fmt(n){
     n = Number(n)||0;
     var c = state.settings.currency || "€";
-    return c + Math.round(n).toLocaleString();
+    return c + n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function monthKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
   function todayZero(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
@@ -1222,7 +1222,7 @@
       var fxNote = "";
       if(e.originalCurrency && e.originalCurrency!=="EUR"){
         var sym = (CURRENCIES[e.originalCurrency]||{}).symbol || "";
-        fxNote = '<div class="tag">' + sym + Math.round(e.originalAmount).toLocaleString() + " " + esc(e.originalCurrency) +
+        fxNote = '<div class="tag">' + sym + Number(e.originalAmount).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) + " " + esc(e.originalCurrency) +
           (e.estimatedRate ? " · estimated rate" : "") + '</div>';
       }
       return '<div class="row" data-expense-id="'+e.id+'" data-cat="'+esc(category)+'">' +
