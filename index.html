@@ -292,18 +292,21 @@
   .sheet-head{ padding:18px 20px 6px; display:flex; justify-content:space-between; align-items:baseline; }
   .sheet-head h3{ font-size:1.15rem; }
   .sheet-body{ padding:8px 20px 4px; display:flex; flex-direction:column; gap:14px; }
-  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field{ display:flex; flex-direction:column; gap:5px; min-width:0; }
   .field label{ font-size:0.76rem; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
   .field input, .field select, .field textarea{
     font-family:inherit; font-size:0.95rem; padding:9px 11px; border-radius:8px;
     border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    width:100%; box-sizing:border-box; min-width:0;
   }
   .field input:focus, .field select:focus, .field textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; }
   .field.check{ flex-direction:row; align-items:center; gap:8px; }
   .field.check input{ width:auto; }
   .field.check label{ text-transform:none; letter-spacing:0; font-size:0.9rem; color:var(--ink); }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .date-select{ display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:6px; }
+  .two-col > *{ min-width:0; }
+  .date-select{ display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:6px; min-width:0; }
+  .date-select select{ min-width:0; }
   .date-select select:disabled{ opacity:0.45; }
   .sheet-foot{ padding:16px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
 
