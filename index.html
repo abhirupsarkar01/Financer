@@ -561,12 +561,10 @@
     <div class="sheet-head"><h3 id="logpayment-title">Log a payment</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
     <div class="sheet-body">
       <input type="hidden" name="id">
-      <div class="two-col">
-        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
-        <div class="field"><label>Date</label>
-          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
-          <input type="hidden" name="date">
-        </div>
+      <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
+      <div class="field"><label>Date</label>
+        <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+        <input type="hidden" name="date">
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
@@ -599,13 +597,11 @@
         <select id="expense-category-select"></select>
         <input id="expense-category-new" placeholder="new category name" hidden>
       </div>
-      <div class="two-col">
-        <div class="field"><label>Date</label>
-          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
-          <input type="hidden" name="date">
-        </div>
-        <div class="field"><label id="expense-amount-label">Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
+      <div class="field"><label>Date</label>
+        <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+        <input type="hidden" name="date">
       </div>
+      <div class="field"><label id="expense-amount-label">Amount</label><input name="amount" type="number" step="0.01" min="0" required></div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
     <div class="sheet-foot">
@@ -833,12 +829,10 @@
       <div class="field"><label>What is this for?</label>
         <select name="target" id="quick-overview-target"></select>
       </div>
-      <div class="two-col">
-        <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
-        <div class="field"><label>Date</label>
-          <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
-          <input type="hidden" name="date">
-        </div>
+      <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0" required autofocus></div>
+      <div class="field"><label>Date</label>
+        <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
+        <input type="hidden" name="date">
       </div>
       <div class="field"><label>Note</label><input name="note" placeholder="optional"></div>
     </div>
@@ -1252,7 +1246,11 @@
       .reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
     document.getElementById("cat-"+slug+"-total").textContent = fmt(monthTotal) + " this month";
     var el = document.getElementById("cat-"+slug+"-list");
-    var article = /^[aeiou]/i.test(category) ? "an" : "a";
+    // "U" is a vowel letter but usually a consonant sound ("utilities" reads
+    // as "yoo-", not a vowel) — excluded here so common cases like that stay
+    // "a", not "an". Not foolproof for every possible category name, but
+    // right for the ones this app actually ships with.
+    var article = /^[aeio]/i.test(category) ? "an" : "a";
     el.innerHTML = items.length ? categoryRowsHtml(category, items) :
       '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add '+article+' '+esc(category.toLowerCase())+' expense.</div>';
   }
