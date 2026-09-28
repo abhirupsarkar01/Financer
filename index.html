@@ -363,13 +363,13 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 2 4 14h6l-1 8 10-12h-6l1-8z"/></svg>
       Utilities
     </button>
-    <button data-tab="misc">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 21 11 12.5 21.5 3 12z"/><circle cx="8" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
-      Misc.
-    </button>
     <button data-tab="entertainment">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M7 3v18M17 3v18M2 8h5M2 16h5M17 8h5M17 16h5"/></svg>
       Entertainment
+    </button>
+    <button data-tab="misc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 21 11 12.5 21.5 3 12z"/><circle cx="8" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+      Misc.
     </button>
 
     <button data-tab="investments">
@@ -481,14 +481,14 @@
       <div class="panel-head" style="padding:0;"><h2>Utilities</h2><span class="meta num" id="cat-utilities-total">—</span></div>
       <div class="panel"><div id="cat-utilities-list"></div></div>
     </section>
+    <section class="tab" id="tab-entertainment">
+      <div class="panel-head" style="padding:0;"><h2>Entertainment</h2><span class="meta num" id="cat-entertainment-total">—</span></div>
+      <div class="panel"><div id="cat-entertainment-list"></div></div>
+    </section>
     <section class="tab" id="tab-misc">
       <div class="panel-head" style="padding:0;"><h2>Miscellaneous</h2><span class="meta num" id="cat-misc-total">—</span></div>
       <div id="misc-suggestions"></div>
       <div class="panel"><div id="cat-misc-list"></div></div>
-    </section>
-    <section class="tab" id="tab-entertainment">
-      <div class="panel-head" style="padding:0;"><h2>Entertainment</h2><span class="meta num" id="cat-entertainment-total">—</span></div>
-      <div class="panel"><div id="cat-entertainment-list"></div></div>
     </section>
 
   </main>
@@ -592,7 +592,10 @@
     <div class="sheet-head"><h3 id="expense-dlg-title">Add an expense</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
     <div class="sheet-body">
       <input type="hidden" name="id">
-      <input type="hidden" name="category">
+      <div class="field"><label>Category</label>
+        <select id="expense-category-select"></select>
+        <input id="expense-category-new" placeholder="new category name" hidden>
+      </div>
       <div class="two-col">
         <div class="field"><label>Date</label>
           <div class="date-select" data-date-target="date"><select class="ds-day"></select><select class="ds-month"></select><select class="ds-year"></select></div>
@@ -1162,7 +1165,7 @@
   // entry logged through its tab still needs to be editable by category).
   var CATEGORY_TABS = {
     groceries:"Groceries", restaurants:"Restaurants", travel:"Travel (non-subscribed)",
-    household:"Household", utilities:"Utilities", misc:"Miscellaneous", entertainment:"Entertainment"
+    household:"Household", utilities:"Utilities", entertainment:"Entertainment", misc:"Miscellaneous"
   };
   var CATEGORY_TAB_LABELS = Object.keys(CATEGORY_TABS).map(function(k){ return CATEGORY_TABS[k]; });
   function allCategories(exclude){
@@ -1814,7 +1817,10 @@
     var f = document.getElementById("form-expense");
     f.reset();
     f.id.value = exp ? exp.id : "";
-    f.category.value = exp ? exp.category : category;
+    document.getElementById("expense-category-new").hidden = true;
+    document.getElementById("expense-category-new").required = false;
+    var startCategory = exp ? exp.category : category;
+    populateCategorySelect(document.getElementById("expense-category-select"), startCategory, []);
     // A saved expense keeps whatever currency it was entered in, forever —
     // only a brand-new entry picks up the currently-selected spending
     // currency. That way editing an old euro expense while traveling (or
@@ -1822,7 +1828,7 @@
     var currency = exp ? (exp.originalCurrency || "EUR") : (state.settings.spendCurrency || "EUR");
     var curInfo = CURRENCIES[currency] || CURRENCIES.EUR;
     document.getElementById("expense-dlg-title").textContent =
-      (exp ? "Edit — " : "Log — ") + f.category.value + (currency!=="EUR" ? " (" + currency + ")" : "");
+      (exp ? "Edit — " : "Log — ") + startCategory + (currency!=="EUR" ? " (" + currency + ")" : "");
     document.getElementById("expense-amount-label").textContent =
       currency==="EUR" ? "Amount" : "Amount (" + curInfo.symbol + " " + currency + ")";
     document.getElementById("expense-delete").style.display = exp ? "" : "none";
@@ -1834,10 +1840,12 @@
     openDlg("dlg-expense");
     if(!exp) f.amount.focus();
   }
+  wireCategorySelect("expense-category-select", "expense-category-new");
   document.getElementById("form-expense").addEventListener("submit", async function(e){
     e.preventDefault();
     var f = e.target;
-    var category = f.category.value;
+    var category = resolvedCategory(document.getElementById("expense-category-select"), document.getElementById("expense-category-new"));
+    if(!category){ document.getElementById("expense-category-new").focus(); return; }
     var note = f.note.value.trim();
     var id = f.id.value;
     var date = f.date.value;
