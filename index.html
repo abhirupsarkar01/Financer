@@ -1246,8 +1246,9 @@
       .reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
     document.getElementById("cat-"+slug+"-total").textContent = fmt(monthTotal) + " this month";
     var el = document.getElementById("cat-"+slug+"-list");
+    var article = /^[aeiou]/i.test(category) ? "an" : "a";
     el.innerHTML = items.length ? categoryRowsHtml(category, items) :
-      '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add a '+esc(category.toLowerCase())+' expense.</div>';
+      '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add '+article+' '+esc(category.toLowerCase())+' expense.</div>';
   }
   function renderCategoryTabs(){
     Object.keys(CATEGORY_TABS).forEach(function(slug){ renderCategoryList(slug, CATEGORY_TABS[slug]); });
