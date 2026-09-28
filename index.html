@@ -367,6 +367,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 21 11 12.5 21.5 3 12z"/><circle cx="8" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
       Misc.
     </button>
+    <button data-tab="entertainment">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M7 3v18M17 3v18M2 8h5M2 16h5M17 8h5M17 16h5"/></svg>
+      Entertainment
+    </button>
 
     <button data-tab="investments">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>
@@ -456,7 +460,7 @@
       <div class="goals" id="goals-list"></div>
     </section>
 
-    <!-- CATEGORY TABS: Groceries, Restaurants, Travel, Household, Utilities, Misc. share one layout -->
+    <!-- CATEGORY TABS: Groceries, Restaurants, Travel, Household, Utilities, Misc., Entertainment share one layout -->
     <section class="tab" id="tab-groceries">
       <div class="panel-head" style="padding:0;"><h2>Groceries</h2><span class="meta num" id="cat-groceries-total">—</span></div>
       <div class="panel"><div id="cat-groceries-list"></div></div>
@@ -481,6 +485,10 @@
       <div class="panel-head" style="padding:0;"><h2>Miscellaneous</h2><span class="meta num" id="cat-misc-total">—</span></div>
       <div id="misc-suggestions"></div>
       <div class="panel"><div id="cat-misc-list"></div></div>
+    </section>
+    <section class="tab" id="tab-entertainment">
+      <div class="panel-head" style="padding:0;"><h2>Entertainment</h2><span class="meta num" id="cat-entertainment-total">—</span></div>
+      <div class="panel"><div id="cat-entertainment-list"></div></div>
     </section>
 
   </main>
@@ -1147,14 +1155,14 @@
   // recur monthly. Anything else typed through "Add new category" folds
   // permanently into this same list from then on (it lives in whatever due
   // or expense first used it, so it reappears on every future dropdown).
-  var BASE_CATEGORIES = ["Rent","Groceries","Restaurants","Travel (non-subscribed)","Household","Utilities","Transport","Subscriptions","Health","Insurance","Miscellaneous"];
+  var BASE_CATEGORIES = ["Rent","Groceries","Restaurants","Travel (non-subscribed)","Household","Utilities","Transport","Subscriptions","Health","Insurance","Miscellaneous","Entertainment"];
   // These have their own dedicated tabs, so offering them again in the
   // Recurring payment dropdown would just be a redundant second path to
   // the same category — excluded there, but still valid on Expenses (an
   // entry logged through its tab still needs to be editable by category).
   var CATEGORY_TABS = {
     groceries:"Groceries", restaurants:"Restaurants", travel:"Travel (non-subscribed)",
-    household:"Household", utilities:"Utilities", misc:"Miscellaneous"
+    household:"Household", utilities:"Utilities", misc:"Miscellaneous", entertainment:"Entertainment"
   };
   var CATEGORY_TAB_LABELS = Object.keys(CATEGORY_TABS).map(function(k){ return CATEGORY_TABS[k]; });
   function allCategories(exclude){
