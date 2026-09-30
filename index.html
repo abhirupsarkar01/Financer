@@ -174,6 +174,18 @@
   .panel.suggest{ background:var(--gold-soft); border-color:var(--gold); }
   .panel.suggest .name{ font-family:"Fraunces",serif; font-weight:600; }
   .panel-head{ display:flex; align-items:baseline; justify-content:space-between; padding:14px 16px 10px; }
+  .panel-head .meta.over-budget{ color:var(--negative); }
+  .cat-search{
+    width:100%; box-sizing:border-box; font-family:inherit; font-size:0.9rem;
+    padding:9px 11px; border-radius:8px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink); margin-bottom:2px;
+  }
+  .cat-search:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .budget-input{
+    width:100px; font-family:inherit; font-size:0.9rem; padding:7px 9px;
+    border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+  }
+  .budget-input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
   .panel-head h2{ font-size:1.05rem; }
   .panel-head .meta{ font-size:0.8rem; color:var(--ink-soft); }
 
@@ -467,30 +479,37 @@
     <!-- CATEGORY TABS: Groceries, Restaurants, Travel, Household, Utilities, Misc., Entertainment share one layout -->
     <section class="tab" id="tab-groceries">
       <div class="panel-head" style="padding:0;"><h2>Groceries</h2><span class="meta num" id="cat-groceries-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="groceries" placeholder="Search groceries…">
       <div class="panel"><div id="cat-groceries-list"></div></div>
     </section>
     <section class="tab" id="tab-restaurants">
       <div class="panel-head" style="padding:0;"><h2>Restaurants</h2><span class="meta num" id="cat-restaurants-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="restaurants" placeholder="Search restaurants…">
       <div class="panel"><div id="cat-restaurants-list"></div></div>
     </section>
     <section class="tab" id="tab-travel">
       <div class="panel-head" style="padding:0;"><h2>Travel (non-subscribed)</h2><span class="meta num" id="cat-travel-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="travel" placeholder="Search travel…">
       <div class="panel"><div id="cat-travel-list"></div></div>
     </section>
     <section class="tab" id="tab-household">
       <div class="panel-head" style="padding:0;"><h2>Household</h2><span class="meta num" id="cat-household-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="household" placeholder="Search household…">
       <div class="panel"><div id="cat-household-list"></div></div>
     </section>
     <section class="tab" id="tab-utilities">
       <div class="panel-head" style="padding:0;"><h2>Utilities</h2><span class="meta num" id="cat-utilities-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="utilities" placeholder="Search utilities…">
       <div class="panel"><div id="cat-utilities-list"></div></div>
     </section>
     <section class="tab" id="tab-entertainment">
       <div class="panel-head" style="padding:0;"><h2>Entertainment</h2><span class="meta num" id="cat-entertainment-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="entertainment" placeholder="Search entertainment…">
       <div class="panel"><div id="cat-entertainment-list"></div></div>
     </section>
     <section class="tab" id="tab-misc">
       <div class="panel-head" style="padding:0;"><h2>Miscellaneous</h2><span class="meta num" id="cat-misc-total">—</span></div>
+      <input type="search" class="cat-search" data-slug="misc" placeholder="Search miscellaneous…">
       <div id="misc-suggestions"></div>
       <div class="panel"><div id="cat-misc-list"></div></div>
     </section>
@@ -638,6 +657,11 @@
         <div class="field"><label>Invested</label><input name="invested" type="number" step="0.01" min="0" required></div>
         <div class="field"><label>Current value</label><input name="currentValue" type="number" step="0.01" min="0" required></div>
       </div>
+      <div class="field" id="investment-history-field" hidden>
+        <label>Value history</label>
+        <div id="investment-history-list" class="panel"></div>
+        <p class="sync-note" style="margin-top:4px;">Each save here records today's value, so this fills in over time as you keep it updated.</p>
+      </div>
     </div>
     <div class="sheet-foot">
       <button type="button" class="btn danger" id="investment-delete" style="display:none;margin-right:auto;">Delete</button>
@@ -733,6 +757,11 @@
         <label>Incentives this month</label>
         <div id="settings-incentives-list" class="panel" style="margin-top:2px;"></div>
         <p class="sync-note" style="margin-top:4px;">Add one from the + button on Overview.</p>
+      </div>
+      <div class="field">
+        <label>Monthly budgets</label>
+        <div id="settings-budgets" class="panel" style="padding:12px 14px; display:flex; flex-direction:column; gap:10px;"></div>
+        <p class="sync-note" style="margin-top:4px;">Leave blank for a category you don't want to cap. A category's total turns red on its own tab once you go over.</p>
       </div>
       <div class="field">
         <label>Backup &amp; reset</label>
@@ -889,7 +918,7 @@
 
   var state = {
     dues: [], expenses: [], investments: [], goals: [], incomes: [],
-    settings: { currency: "€", monthlyIncome: 0, spendCurrency: "EUR" },
+    settings: { currency: "€", monthlyIncome: 0, spendCurrency: "EUR", budgets: {} },
     fxCache: {}
   };
 
@@ -1275,20 +1304,35 @@
         '<div class="actions"><button data-edit-expense="'+e.id+'" data-cat="'+esc(category)+'" aria-label="Edit">'+svgEdit()+'</button></div></div>';
     }).join("");
   }
+  var categorySearchTerms = {};
   function renderCategoryList(slug, category){
     var items = state.expenses.filter(function(e){ return e.category===category; })
       .sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
     var monthTotal = expensesInMonth(new Date()).filter(function(e){ return e.category===category; })
       .reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
-    document.getElementById("cat-"+slug+"-total").textContent = fmt(monthTotal) + " this month";
+    var budget = Number((state.settings.budgets||{})[category]) || 0;
+    var totalEl = document.getElementById("cat-"+slug+"-total");
+    totalEl.textContent = budget>0
+      ? fmt(monthTotal) + " of " + fmt(budget) + " this month"
+      : fmt(monthTotal) + " this month";
+    totalEl.className = "meta num" + (budget>0 && monthTotal>budget ? " over-budget" : "");
+    var term = (categorySearchTerms[slug]||"").trim().toLowerCase();
+    if(term){
+      items = items.filter(function(e){ return (e.note||"").toLowerCase().indexOf(term)>-1; });
+    }
     var el = document.getElementById("cat-"+slug+"-list");
     // "U" is a vowel letter but usually a consonant sound ("utilities" reads
     // as "yoo-", not a vowel) — excluded here so common cases like that stay
     // "a", not "an". Not foolproof for every possible category name, but
     // right for the ones this app actually ships with.
     var article = /^[aeio]/i.test(category) ? "an" : "a";
-    el.innerHTML = items.length ? categoryRowsHtml(category, items) :
-      '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add '+article+' '+esc(category.toLowerCase())+' expense.</div>';
+    if(items.length){
+      el.innerHTML = categoryRowsHtml(category, items);
+    } else if(term){
+      el.innerHTML = '<div class="empty">No expenses match "'+esc(categorySearchTerms[slug])+'".</div>';
+    } else {
+      el.innerHTML = '<div class="empty"><strong>Nothing logged yet</strong>Tap + to add '+article+' '+esc(category.toLowerCase())+' expense.</div>';
+    }
   }
   function renderCategoryTabs(){
     Object.keys(CATEGORY_TABS).forEach(function(slug){ renderCategoryList(slug, CATEGORY_TABS[slug]); });
@@ -1354,6 +1398,17 @@
     var yearEl = document.getElementById("backup-year");
     if(!yearEl.value) yearEl.value = String(new Date().getFullYear());
     renderIncentivesList();
+    renderBudgetInputs();
+  }
+  function renderBudgetInputs(){
+    var budgets = state.settings.budgets || {};
+    var wrap = document.getElementById("settings-budgets");
+    wrap.innerHTML = Object.keys(CATEGORY_TABS).map(function(slug){
+      var cat = CATEGORY_TABS[slug];
+      var val = budgets[cat] != null ? budgets[cat] : "";
+      return '<div class="row"><div class="main"><div class="name">'+esc(cat)+'</div></div>' +
+        '<input type="number" step="0.01" min="0" class="budget-input" data-budget-cat="'+esc(cat)+'" value="'+esc(String(val))+'" placeholder="no limit"></div>';
+    }).join("");
   }
   function renderIncentivesList(){
     var mk = monthKey(new Date());
@@ -1870,6 +1925,12 @@
     });
   }
   wireRecurringList("dues-list");
+  document.querySelectorAll(".cat-search").forEach(function(input){
+    input.addEventListener("input", function(){
+      categorySearchTerms[input.dataset.slug] = input.value;
+      renderCategoryList(input.dataset.slug, CATEGORY_TABS[input.dataset.slug]);
+    });
+  });
   document.getElementById("ov-due-list").addEventListener("click", function(e){});
 
   // ---------- EXPENSE form ----------
@@ -2034,13 +2095,31 @@
     document.getElementById("investment-dlg-title").textContent = inv ? "Edit holding" : "Add a holding";
     document.getElementById("investment-delete").style.display = inv ? "" : "none";
     if(inv){ f.name.value = inv.name; f.type.value = inv.type; f.invested.value = inv.invested; f.currentValue.value = inv.currentValue; }
+    var histField = document.getElementById("investment-history-field");
+    var history = (inv && inv.valueHistory) || [];
+    histField.hidden = history.length===0;
+    if(history.length){
+      document.getElementById("investment-history-list").innerHTML = history.slice().reverse().map(function(h){
+        return '<div class="row"><div class="main"><div class="name">'+fmtShortDate(h.date)+'</div></div><span class="amt num">'+fmt(h.value)+'</span></div>';
+      }).join("");
+    }
     openDlg("dlg-investment");
   }
   document.getElementById("form-investment").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
-    var data = { name: f.name.value.trim(), type: f.type.value, invested: parseFloat(f.invested.value)||0, currentValue: parseFloat(f.currentValue.value)||0 };
     var id = f.id.value;
+    var currentValue = parseFloat(f.currentValue.value)||0;
+    var existing = id ? state.investments.find(function(x){ return x.id===id; }) : null;
+    // A snapshot of today's value, recorded on every save — replacing
+    // rather than duplicating if it's saved twice the same day — so
+    // editing a holding over time builds a value-over-time record for
+    // free, without a separate "log a value" step.
+    var history = (existing && existing.valueHistory) ? existing.valueHistory.slice() : [];
+    var today = todayISO();
+    if(history.length && history[history.length-1].date===today) history[history.length-1].value = currentValue;
+    else history.push({date: today, value: currentValue});
+    var data = { name: f.name.value.trim(), type: f.type.value, invested: parseFloat(f.invested.value)||0, currentValue: currentValue, valueHistory: history };
     (id ? updateItem("investment", id, data) : addItem("investment", data)).then(function(){ f.closest("dialog").close(); });
   });
   document.getElementById("investment-delete").addEventListener("click", function(){
@@ -2508,7 +2587,12 @@
   document.getElementById("form-settings").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
-    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0, spendCurrency: f.spendCurrency.value || "EUR" })
+    var budgets = {};
+    document.querySelectorAll(".budget-input").forEach(function(input){
+      var v = parseFloat(input.value);
+      if(v>0) budgets[input.dataset.budgetCat] = v;
+    });
+    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0, spendCurrency: f.spendCurrency.value || "EUR", budgets: budgets })
       .then(function(){ f.closest("dialog").close(); });
   });
 
