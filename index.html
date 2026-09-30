@@ -200,6 +200,7 @@
   .chip.scheduled{ background:var(--line); color:var(--ink-soft); }
   .chip.completed{ background:var(--line); color:var(--ink-soft); }
   .chip.stopped{ background:var(--line); color:var(--ink-soft); }
+  .chip.skipped{ background:var(--line); color:var(--ink-soft); }
   .name-btn{ background:none; border:none; padding:0; font:inherit; font-weight:500; color:inherit; cursor:pointer; text-align:left; }
   .name-btn:hover{ text-decoration:underline; }
   .btn.ghost.danger{ color:var(--negative); }
@@ -526,6 +527,14 @@
         <div class="two-col">
           <div class="field"><label>Amount</label><input name="amount" type="number" step="0.01" min="0"></div>
           <div class="field"><label>Due day of month</label><select name="dueDay" id="due-day-select"></select></div>
+        </div>
+        <div class="field"><label>Repeats</label>
+          <select name="repeatCadence" id="due-repeat-cadence">
+            <option value="monthly">Every month</option>
+            <option value="quarterly">Every 3 months</option>
+            <option value="yearly">Every year</option>
+          </select>
+          <p class="sync-note" style="margin:2px 0 0;">For every 3 months / every year, Starts below sets which month the cycle lands in.</p>
         </div>
         <div class="two-col">
           <div class="field"><label>Starts</label><input name="startMonth" type="month"></div>
@@ -986,15 +995,39 @@
   function monthKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
   function todayZero(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
   function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  function nextDueDate(dueDay, today){
-    var y=today.getFullYear(), m=today.getMonth();
-    var daysInMonth = new Date(y, m+1, 0).getDate();
-    var day = Math.min(dueDay, daysInMonth);
-    return new Date(y, m, day);
+  // A fixed due's cycle: monthly (every month, the default and the only
+  // option before repeatCadence existed — absent means monthly), quarterly
+  // (every 3 months from its Starts month), or yearly (every 12). "Starts"
+  // doubles as the cycle's anchor month for the two longer cadences.
+  function cadenceMonthsOf(due){
+    return due.repeatCadence==="yearly" ? 12 : due.repeatCadence==="quarterly" ? 3 : 1;
   }
   function monthIndex(ym){
     var p = String(ym||"").split("-");
     return (parseInt(p[0],10)||0)*12 + (parseInt(p[1],10)||1);
+  }
+  function isDueInMonth(due, ym){
+    var cm = cadenceMonthsOf(due);
+    if(cm===1) return true;
+    var anchor = due.startMonth || ym;
+    var diff = monthIndex(ym) - monthIndex(anchor);
+    return ((diff % cm) + cm) % cm === 0;
+  }
+  // Walks forward from today's month (at most a year, which covers the
+  // longest cadence) to the next month this due actually falls in, then
+  // returns that month's due day — capped to however many days it has.
+  function nextDueDate(due, today){
+    var y=today.getFullYear(), m=today.getMonth();
+    for(var i=0;i<12;i++){
+      var ym = y+"-"+String(m+1).padStart(2,"0");
+      if(isDueInMonth(due, ym)){
+        var daysInMonth = new Date(y, m+1, 0).getDate();
+        var day = Math.min(due.dueDay, daysInMonth);
+        return new Date(y, m, day);
+      }
+      m++; if(m>11){ m=0; y++; }
+    }
+    return today;
   }
   // Where a fixed-schedule item stands relative to its optional start month
   // and term length: not started yet, actively due, or its term has run out.
@@ -1023,7 +1056,8 @@
     var today = todayZero();
     var mk = monthKey(today);
     if(due.paidMonth === mk){ return {kind:"paid", label:"Paid", sortKey:20000}; }
-    var dd = nextDueDate(due.dueDay, today);
+    if(due.skippedMonths && due.skippedMonths.indexOf(mk)>-1){ return {kind:"skipped", label:"Skipped", sortKey:22000}; }
+    var dd = nextDueDate(due, today);
     var diff = Math.round((dd - today)/86400000);
     if(diff < 0) return {kind:"overdue", label:"Overdue " + Math.abs(diff) + "d", sortKey:diff};
     if(diff <= 3) return {kind:"soon", label: diff===0 ? "Due today" : "Due in "+diff+"d", sortKey:diff};
@@ -1145,7 +1179,8 @@
       if(d.schedule==="flexible" || d.status==="stopped" || !d.autopay) return;
       if(fixedPhase(d).phase!=="active") return;
       if(d.paidMonth===mk) return;
-      if(nextDueDate(d.dueDay, today) > today) return;
+      if(d.skippedMonths && d.skippedMonths.indexOf(mk)>-1) return;
+      if(nextDueDate(d, today) > today) return;
       var flag = d.id+"|"+mk;
       if(autoLoggedThisSession[flag]) return;
       autoLoggedThisSession[flag] = true;
@@ -1445,7 +1480,8 @@
           '<button data-edit-due="'+d.id+'" aria-label="Edit">'+svgEdit()+'</button>' +
         '</div></div>';
     }
-    var tag = esc(d.category) + " · day " + d.dueDay + (d.autopay ? " · autopay" : "");
+    var cadenceTag = d.repeatCadence==="yearly" ? " · yearly" : d.repeatCadence==="quarterly" ? " · quarterly" : "";
+    var tag = esc(d.category) + " · day " + d.dueDay + cadenceTag + (d.autopay ? " · autopay" : "");
     if(d.termMonths){
       var ph = fixedPhase(d);
       tag += ph.remaining!=null ? " · " + Math.max(ph.elapsed,1) + "/" + d.termMonths : "";
@@ -1486,7 +1522,7 @@
 
   function renderDues(){
     var monthlyFixed = state.dues.filter(function(d){ return d.schedule!=="flexible" && d.status!=="stopped" && fixedPhase(d).phase==="active"; })
-      .reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+      .reduce(function(s,d){ return s+(Number(d.amount)||0)/cadenceMonthsOf(d); },0);
     document.getElementById("dues-total").textContent = state.dues.length + (state.dues.length===1?" item":" items") + " · " + fmt(monthlyFixed) + "/mo fixed";
     var el = document.getElementById("dues-list");
     var html = recurringGroupsHtml("Mark paid");
@@ -1655,12 +1691,14 @@
         f.originalAmount.value = due.originalAmount||"";
       } else {
         f.amount.value = due.amount;
+        f.repeatCadence.value = due.repeatCadence || "monthly";
         f.startMonth.value = due.startMonth||"";
         updateDueDayOptions(f, due.dueDay);
         f.termMonths.value = due.termMonths||"";
         f.autopay.checked = !!due.autopay;
       }
     } else {
+      f.repeatCadence.value = "monthly";
       f.startMonth.value = monthKey(new Date());
       updateDueDayOptions(f);
       if(prefill) f.name.value = prefill.name;
@@ -1698,6 +1736,7 @@
     } else {
       data.amount = parseFloat(f.amount.value)||0;
       data.dueDay = parseInt(f.dueDay.value,10)||1;
+      data.repeatCadence = f.repeatCadence.value || "monthly";
       data.startMonth = f.startMonth.value || monthKey(new Date());
       data.termMonths = f.termMonths.value ? (parseInt(f.termMonths.value,10)||null) : null;
       data.autopay = f.autopay.checked;
@@ -1748,6 +1787,17 @@
 
   // ---------- DUE DETAIL (full history for one recurring payment) ----------
   async function stopDue(id){ await updateItem("due", id, {status:"stopped"}); }
+  // A one-off skip for this cycle only (e.g. a frozen gym membership for a
+  // month) — unlike Stop, the schedule stays active and resumes its normal
+  // cadence next cycle with no separate un-skip step needed.
+  async function skipDueThisCycle(id){
+    var due = state.dues.find(function(d){ return d.id===id; });
+    if(!due) return;
+    var mk = monthKey(new Date());
+    var skipped = (due.skippedMonths||[]).slice();
+    if(skipped.indexOf(mk)===-1) skipped.push(mk);
+    await updateItem("due", id, {skippedMonths: skipped});
+  }
   function openDueDetail(dueId){
     var due = state.dues.find(function(d){ return d.id===dueId; });
     if(!due) return;
@@ -1755,7 +1805,12 @@
     document.getElementById("due-detail-title").textContent = due.name;
     var metaParts = [due.category];
     if(due.schedule==="flexible") metaParts.push("flexible");
-    else { metaParts.push("day "+due.dueDay); if(due.autopay) metaParts.push("autopay"); }
+    else {
+      metaParts.push("day "+due.dueDay);
+      if(due.repeatCadence==="yearly") metaParts.push("yearly");
+      else if(due.repeatCadence==="quarterly") metaParts.push("quarterly");
+      if(due.autopay) metaParts.push("autopay");
+    }
     document.getElementById("due-detail-meta").innerHTML =
       esc(metaParts.join(" · ")) + ' <span class="chip '+st.kind+'" style="margin-left:4px;">'+st.label+'</span>';
 
@@ -1776,6 +1831,7 @@
       actions += '<button class="btn primary" data-log-flex-detail="'+due.id+'">Log payment</button>';
     } else if(fixedPhase(due).phase==="active" && st.kind!=="paid"){
       actions += '<button class="btn primary" data-mark-paid-detail="'+due.id+'">Mark paid</button>';
+      if(st.kind!=="skipped") actions += '<button class="btn ghost" data-skip-due-detail="'+due.id+'">Skip this cycle</button>';
     }
     actions += '<button class="btn ghost" data-edit-due-detail="'+due.id+'">Edit</button>';
     if(due.status!=="stopped"){
@@ -1790,7 +1846,9 @@
     var resumeBtn = e.target.closest("[data-resume-due-detail]");
     var editBtn = e.target.closest("[data-edit-due-detail]");
     var stopBtn = e.target.closest("[data-stop-due-detail]");
+    var skipBtn = e.target.closest("[data-skip-due-detail]");
     if(payBtn) logDuePaid(payBtn.dataset.markPaidDetail).then(function(){ openDueDetail(payBtn.dataset.markPaidDetail); });
+    if(skipBtn) skipDueThisCycle(skipBtn.dataset.skipDueDetail).then(function(){ openDueDetail(skipBtn.dataset.skipDueDetail); });
     if(logBtn){ document.getElementById("dlg-due-detail").close(); openLogPaymentDialog(logBtn.dataset.logFlexDetail); }
     if(resumeBtn){ document.getElementById("dlg-due-detail").close(); openDueDialog(state.dues.find(function(d){return d.id===resumeBtn.dataset.resumeDueDetail;})); }
     if(editBtn){ document.getElementById("dlg-due-detail").close(); openDueDialog(state.dues.find(function(d){return d.id===editBtn.dataset.editDueDetail;})); }
@@ -2354,7 +2412,7 @@
         d.schedule==="flexible" ? "" : (Number(d.amount)||0).toFixed(2),
         d.schedule==="flexible" ? "" : (d.dueDay||""),
         d.schedule==="flexible" ? "" : (d.autopay?"yes":"no"),
-        d.schedule==="flexible" ? (d.cadence||"") : ""
+        d.schedule==="flexible" ? (d.cadence||"") : (d.repeatCadence||"monthly")
       ].join(","));
     });
 
