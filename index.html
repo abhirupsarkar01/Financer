@@ -824,8 +824,9 @@
      payment" buttons above -->
 <dialog id="dlg-quick-overview">
   <form class="sheet" id="form-quick-overview">
-    <div class="sheet-head"><h3>Quick log</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
+    <div class="sheet-head"><h3 id="quick-overview-title">Quick log</h3><button type="button" class="btn ghost small" data-close>Cancel</button></div>
     <div class="sheet-body">
+      <input type="hidden" name="id">
       <div class="field"><label>What is this for?</label>
         <select name="target" id="quick-overview-target"></select>
       </div>
@@ -1329,7 +1330,8 @@
       var dl = d ? d.toLocaleDateString(undefined,{day:"2-digit",month:"short"}) : "";
       return '<div class="row"><div class="main"><div class="name">'+esc(i.note||"Incentive")+'</div><div class="tag">'+dl+'</div></div>' +
         '<span class="amt pos num">+'+fmt(i.amount)+'</span>' +
-        '<div class="actions"><button data-delete-incentive="'+i.id+'" aria-label="Delete">'+svgTrash()+'</button></div></div>';
+        '<div class="actions"><button data-edit-incentive="'+i.id+'" aria-label="Edit">'+svgEdit()+'</button>' +
+        '<button data-delete-incentive="'+i.id+'" aria-label="Delete">'+svgTrash()+'</button></div></div>';
     }).join("") : '<div class="empty">None logged this month.</div>';
   }
 
@@ -1721,7 +1723,9 @@
   });
   document.getElementById("due-delete").addEventListener("click", function(){
     var id = document.getElementById("form-due").id.value;
-    if(id) deleteItem("due", id).then(function(){ document.getElementById("dlg-due").close(); });
+    if(id && confirm("Delete this recurring payment? Its past expense history stays, but the schedule itself is gone. There is no undo.")){
+      deleteItem("due", id).then(function(){ document.getElementById("dlg-due").close(); });
+    }
   });
 
   // ---------- LOG A FLEXIBLE PAYMENT form ----------
@@ -1878,7 +1882,9 @@
   });
   document.getElementById("expense-delete").addEventListener("click", function(){
     var id = document.getElementById("form-expense").id.value;
-    if(id) deleteItem("expense", id).then(function(){ document.getElementById("dlg-expense").close(); });
+    if(id && confirm("Delete this expense? There is no undo.")){
+      deleteItem("expense", id).then(function(){ document.getElementById("dlg-expense").close(); });
+    }
   });
   // One delegated listener (on the whole document, since it also has to
   // reach the report dialog's own filtered lists) covers every edit
@@ -1981,7 +1987,9 @@
   });
   document.getElementById("investment-delete").addEventListener("click", function(){
     var id = document.getElementById("form-investment").id.value;
-    if(id) deleteItem("investment", id).then(function(){ document.getElementById("dlg-investment").close(); });
+    if(id && confirm("Delete this investment? There is no undo.")){
+      deleteItem("investment", id).then(function(){ document.getElementById("dlg-investment").close(); });
+    }
   });
   document.getElementById("investments-list").addEventListener("click", function(e){
     var editBtn = e.target.closest("[data-edit-investment]");
@@ -2008,7 +2016,9 @@
   });
   document.getElementById("goal-delete").addEventListener("click", function(){
     var id = document.getElementById("form-goal").id.value;
-    if(id) deleteItem("goal", id).then(function(){ document.getElementById("dlg-goal").close(); });
+    if(id && confirm("Delete this savings goal? There is no undo.")){
+      deleteItem("goal", id).then(function(){ document.getElementById("dlg-goal").close(); });
+    }
   });
   document.getElementById("goals-list").addEventListener("click", function(e){
     var editBtn = e.target.closest("[data-edit-goal]");
@@ -2444,10 +2454,18 @@
       .then(function(){ f.closest("dialog").close(); });
   });
 
-  // ---------- INCENTIVES (view/delete only — adding happens via the FAB) ----------
+  // ---------- INCENTIVES (edit/delete — adding happens via the FAB) ----------
   document.getElementById("settings-incentives-list").addEventListener("click", function(e){
     var delBtn = e.target.closest("[data-delete-incentive]");
-    if(delBtn) deleteItem("income", delBtn.dataset.deleteIncentive);
+    if(delBtn){
+      if(confirm("Delete this incentive? There is no undo.")) deleteItem("income", delBtn.dataset.deleteIncentive);
+      return;
+    }
+    var editBtn = e.target.closest("[data-edit-incentive]");
+    if(editBtn){
+      var income = state.incomes.find(function(i){ return i.id===editBtn.dataset.editIncentive; });
+      if(income) openEditIncentiveDialog(income);
+    }
   });
 
   // ---------- OVERVIEW QUICK LOG (an incentive, or a payment against any
@@ -2455,8 +2473,11 @@
   function openQuickOverviewDialog(){
     var f = document.getElementById("form-quick-overview");
     f.reset();
+    f.id.value = "";
+    document.getElementById("quick-overview-title").textContent = "Quick log";
     setDateSelectValue(f, "date", todayISO());
     var sel = document.getElementById("quick-overview-target");
+    sel.disabled = false;
     var activeDues = state.dues.filter(function(d){ return d.status!=="stopped"; })
       .slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
     var html = '<option value="incentive">Incentive (extra income)</option>';
@@ -2468,6 +2489,24 @@
     sel.innerHTML = html;
     openDlg("dlg-quick-overview");
   }
+  // Editing an incentive reuses the same dialog, locked to the "Incentive"
+  // target — a logged recurring-due payment isn't editable this way since
+  // it also moves the due's own lastPaid/paidMonth/paidTotal, so changing
+  // it after the fact would desync those; only the incentive path is
+  // purely a standalone income record, safe to edit in place.
+  function openEditIncentiveDialog(income){
+    var f = document.getElementById("form-quick-overview");
+    f.reset();
+    f.id.value = income.id;
+    document.getElementById("quick-overview-title").textContent = "Edit incentive";
+    var sel = document.getElementById("quick-overview-target");
+    sel.innerHTML = '<option value="incentive">Incentive (extra income)</option>';
+    sel.disabled = true;
+    setDateSelectValue(f, "date", income.date);
+    f.amount.value = income.amount;
+    f.note.value = income.note||"";
+    openDlg("dlg-quick-overview");
+  }
   document.getElementById("form-quick-overview").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
@@ -2475,9 +2514,12 @@
     var amount = parseFloat(f.amount.value)||0;
     var date = f.date.value;
     var note = f.note.value.trim();
-    var task = target==="incentive"
-      ? addItem("income", { date: date, amount: amount, note: note })
-      : logQuickPayment(target.slice(4), amount, date, note);
+    var id = f.id.value;
+    var task = id
+      ? updateItem("income", id, { date: date, amount: amount, note: note })
+      : (target==="incentive"
+          ? addItem("income", { date: date, amount: amount, note: note })
+          : logQuickPayment(target.slice(4), amount, date, note));
     task.then(function(){ f.closest("dialog").close(); });
   });
   // A payment logged this way works for either schedule: it drops the
