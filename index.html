@@ -717,6 +717,11 @@
     <div class="sheet-body">
       <div class="field"><label>Monthly income</label><input name="monthlyIncome" type="number" step="0.01" min="0"></div>
       <div class="field">
+        <label>Carried balance</label>
+        <input name="carriedBalance" type="number" step="0.01">
+        <p class="sync-note" style="margin-top:4px;">What's left over banks in here automatically at the start of each month. Correct it by hand if a past month's figure ever looks off (e.g. your salary changed since).</p>
+      </div>
+      <div class="field">
         <label>Spending currency</label>
         <select name="spendCurrency" id="settings-spend-currency">
           <option value="EUR">€ Euro (home)</option>
@@ -918,7 +923,7 @@
 
   var state = {
     dues: [], expenses: [], investments: [], goals: [], incomes: [],
-    settings: { currency: "€", monthlyIncome: 0, spendCurrency: "EUR", budgets: {} },
+    settings: { currency: "€", monthlyIncome: 0, spendCurrency: "EUR", budgets: {}, carriedBalance: 0, lastRolloverMonth: null },
     fxCache: {}
   };
 
@@ -1012,6 +1017,7 @@
 
   function initStore(){
     loadLocal();
+    rollForwardBalance();
     renderAll();
   }
 
@@ -1068,6 +1074,69 @@
     if(due.termMonths && elapsed > Number(due.termMonths)) return {phase:"completed", elapsed:elapsed};
     return {phase:"active", elapsed:elapsed, remaining: due.termMonths ? (Number(due.termMonths)-elapsed+1) : null};
   }
+  // ---------- month-end rollover (carried balance) ----------
+  // "Available this month" used to be a pure snapshot — it zeroed out every
+  // time the calendar rolled over, even though no money actually vanished.
+  // This walks forward from whatever month the app last caught up to, banks
+  // each closed month's real leftover into a persisted running total, and
+  // leaves the current (still-open) month to the live calculation in
+  // renderOverview(). Monthly income is assumed constant for past months,
+  // since the app doesn't keep a salary history — only today's figure.
+  function nextMonthKey(ym){
+    var p = String(ym).split("-"), y = parseInt(p[0],10), m = parseInt(p[1],10);
+    m++; if(m>12){ m=1; y++; }
+    return y+"-"+String(m).padStart(2,"0");
+  }
+  // Whether a fixed due counted as a real, already-elapsed obligation during
+  // a month that has fully closed — i.e. it had started, hadn't finished its
+  // term, wasn't skipped that cycle, and its cadence landed in that month.
+  function historicalDueApplies(due, ym){
+    if(due.schedule === "flexible" || due.status === "stopped") return false;
+    var startYM = due.startMonth || ym;
+    if(ym < startYM) return false;
+    if(due.termMonths){
+      var elapsed = monthIndex(ym) - monthIndex(startYM) + 1;
+      if(elapsed > Number(due.termMonths)) return false;
+    }
+    if(due.skippedMonths && due.skippedMonths.indexOf(ym)>-1) return false;
+    return isDueInMonth(due, ym);
+  }
+  // A closed month's actual leftover: salary + that month's incentives,
+  // minus that month's expenses and the fixed dues that applied in it.
+  function computeMonthLeftover(ym){
+    var income = (Number(state.settings.monthlyIncome)||0) +
+      state.incomes.filter(function(i){ return (i.date||"").slice(0,7)===ym; })
+        .reduce(function(s,i){ return s+(Number(i.amount)||0); },0);
+    var spent = state.expenses.filter(function(e){ return (e.date||"").slice(0,7)===ym; })
+      .reduce(function(s,e){ return s+(Number(e.amount)||0); },0);
+    var dues = state.dues.filter(function(d){ return historicalDueApplies(d, ym); })
+      .reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
+    return income - spent - dues;
+  }
+  // First month there's any trace of activity, so a brand-new rollover
+  // doesn't just start counting from whenever this feature shipped — it
+  // backfills from real history already sitting in local storage.
+  function earliestDataMonth(){
+    var months = []
+      .concat(state.expenses.map(function(e){ return (e.date||"").slice(0,7); }))
+      .concat(state.incomes.map(function(i){ return (i.date||"").slice(0,7); }))
+      .concat(state.dues.map(function(d){ return d.startMonth || ""; }))
+      .filter(Boolean);
+    if(months.length===0) return monthKey(new Date());
+    return months.reduce(function(min,m){ return m<min ? m : min; });
+  }
+  function rollForwardBalance(){
+    var cur = monthKey(new Date());
+    if(!state.settings.lastRolloverMonth){ state.settings.lastRolloverMonth = earliestDataMonth(); }
+    var changed = false;
+    while(state.settings.lastRolloverMonth < cur){
+      state.settings.carriedBalance = (Number(state.settings.carriedBalance)||0) + computeMonthLeftover(state.settings.lastRolloverMonth);
+      state.settings.lastRolloverMonth = nextMonthKey(state.settings.lastRolloverMonth);
+      changed = true;
+    }
+    if(changed) saveLocal();
+  }
+
   // Unified status used for sorting and chip rendering across both schedule
   // kinds. sortKey buckets: overdue/upcoming fixed items first (by urgency),
   // then flexible items, then paid, then not-yet-started or finished ones,
@@ -1394,6 +1463,7 @@
     var el = document.getElementById("today-label");
     el.textContent = new Date().toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
     document.querySelector('[name="monthlyIncome"]').value = state.settings.monthlyIncome || "";
+    document.querySelector('[name="carriedBalance"]').value = state.settings.carriedBalance || "";
     document.getElementById("settings-spend-currency").value = state.settings.spendCurrency || "EUR";
     var yearEl = document.getElementById("backup-year");
     if(!yearEl.value) yearEl.value = String(new Date().getFullYear());
@@ -1458,11 +1528,13 @@
       return st.kind==="paid" || st.kind==="overdue" || ((st.kind==="soon"||st.kind==="upcoming") && st.sortKey<=0);
     }).reduce(function(s,d){ return s+(Number(d.amount)||0); },0);
 
-    var available = incomeTotal - spent - duesThisMonthTotal;
+    var carried = Number(state.settings.carriedBalance)||0;
+    var available = carried + incomeTotal - spent - duesThisMonthTotal;
     var availEl = document.getElementById("ov-available");
     availEl.textContent = fmt(available);
     availEl.className = "value num" + (available < 0 ? " negative" : "");
     document.getElementById("ov-available-sub").textContent =
+      (carried ? fmt(carried) + " carried + " : "") +
       fmt(incomeTotal) + " income − " + fmt(spent + duesThisMonthTotal) + " spent & due so far";
 
     if(incomeTotal > 0){
@@ -2515,7 +2587,7 @@
   document.getElementById("btn-flush-data").addEventListener("click", function(){ openDlg("dlg-flush-confirm"); });
   document.getElementById("btn-flush-confirm-yes").addEventListener("click", function(){
     state.dues = []; state.expenses = []; state.investments = []; state.goals = []; state.incomes = [];
-    state.settings = { currency: "€", monthlyIncome: 0, spendCurrency: "EUR" };
+    state.settings = { currency: "€", monthlyIncome: 0, spendCurrency: "EUR", budgets: {}, carriedBalance: 0, lastRolloverMonth: null };
     state.fxCache = {};
     saveLocal();
     document.getElementById("dlg-flush-confirm").close();
@@ -2574,7 +2646,7 @@
     state.investments = pendingImportData.investments || [];
     state.goals = pendingImportData.goals || [];
     state.incomes = pendingImportData.incomes || [];
-    state.settings = Object.assign({ currency: "€", monthlyIncome: 0, spendCurrency: "EUR" }, pendingImportData.settings || {});
+    state.settings = Object.assign({ currency: "€", monthlyIncome: 0, spendCurrency: "EUR", budgets: {}, carriedBalance: 0, lastRolloverMonth: null }, pendingImportData.settings || {});
     state.fxCache = pendingImportData.fxCache || {};
     pendingImportData = null;
     saveLocal();
@@ -2592,7 +2664,7 @@
       var v = parseFloat(input.value);
       if(v>0) budgets[input.dataset.budgetCat] = v;
     });
-    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0, spendCurrency: f.spendCurrency.value || "EUR", budgets: budgets })
+    saveSettings({ monthlyIncome: parseFloat(f.monthlyIncome.value)||0, carriedBalance: parseFloat(f.carriedBalance.value)||0, spendCurrency: f.spendCurrency.value || "EUR", budgets: budgets })
       .then(function(){ f.closest("dialog").close(); });
   });
 
